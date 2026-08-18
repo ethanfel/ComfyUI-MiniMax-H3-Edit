@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-minimax-h3-edit"
-version = "0.1.0"
-description = "Minimal one-frame MiniMax H3 photo editing with native or semantic references"
+version = "0.2.0"
+description = "Minimal single-image MiniMax H3 photo editing with native or semantic references"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }

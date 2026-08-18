@@ -1,4 +1,4 @@
-"""Standalone one-frame MiniMax H3 edit conditioning and decode nodes."""
+"""Standalone single-image MiniMax H3 edit conditioning and decode nodes."""
 
 from __future__ import annotations
 
@@ -15,7 +15,21 @@ MAX_SEMANTIC_RESOLUTION = 3584
 H3_VIDEO_CHANNELS = 24
 H3_AUDIO_CHANNELS = 32
 H3_AUDIO_STEREO = 2
-H3_AUDIO_FRAMES_FOR_ONE_IMAGE = 2
+FPS = 24
+AUDIO_LATENT_FPS = 40
+
+QUALITY_RECOMMENDED = "recommended | 22-frame context -> 1 image"
+QUALITY_FAST = "fast | 5-frame context -> 1 image"
+QUALITY_HIGH = "high | 39-frame context -> 1 image"
+QUALITY_MAXIMUM = "maximum | 56-frame context -> 1 image"
+QUALITY_EXPERIMENTAL = "experimental | true 1 frame (low quality)"
+QUALITY_PROFILES = {
+    QUALITY_RECOMMENDED: 22,
+    QUALITY_FAST: 5,
+    QUALITY_HIGH: 39,
+    QUALITY_MAXIMUM: 56,
+    QUALITY_EXPERIMENTAL: 1,
+}
 
 REFERENCE_NONE = "none (source only)"
 REFERENCE_SEMANTIC = "semantic (Qwen only)"
@@ -162,7 +176,7 @@ def _native_reference_size(
     return _fit_grid_area(source_width, source_height, target_area)
 
 
-def _build_prompt(prompt: str, prompt_mode: str, reference_mode: str) -> str:
+def _build_prompt(prompt: str, prompt_mode: str, reference_mode: str, frame_count: int) -> str:
     prompt = (prompt or "").strip()
     if prompt_mode == PROMPT_VERBATIM:
         return prompt
@@ -177,36 +191,75 @@ def _build_prompt(prompt: str, prompt_mode: str, reference_mode: str) -> str:
             " <Picture 2> is a native visual reference. Use its detailed appearance only where the requested edit "
             "calls for it."
         )
+    still_contract = (
+        " Produce exactly one finished still image."
+        if frame_count == 1
+        else (
+            " Apply the edit immediately after the source anchor, then hold the fully completed result unchanged "
+            "across the short internal frame packet: locked camera, fixed composition, no subject motion, and no "
+            "temporal progression. The final frame must be a crisp finished still image."
+        )
+    )
     return (
         "Edit <Picture 1>, which is the source image and frame-zero anchor. Preserve the source identity, facial "
         "structure, pose, framing, lighting, background, and all unrequested details."
-        f"{guide} Produce exactly one finished still image. Requested edit: {prompt}"
+        f"{guide}{still_contract} Requested edit: {prompt}"
     )
 
 
-def _empty_one_frame_h3_latent(width: int, height: int) -> dict[str, Any]:
+def _decoded_frames_for_latent_t(latent_t: int) -> int:
+    latent_t = max(1, int(latent_t))
+    if latent_t == 1:
+        return 1
+    frame_per_token = (1, 4, 4, 4, 4)
+    return sum(frame_per_token[index % len(frame_per_token)] for index in range(latent_t))
+
+
+def _latent_t_for_frame_count(frame_count: int) -> tuple[int, int]:
+    requested = max(1, int(frame_count))
+    if requested == 1:
+        return 1, 1
+    requested = max(5, requested)
+    while requested % 17 != 5:
+        requested += 1
+    latent_t = 1
+    while _decoded_frames_for_latent_t(latent_t) < requested:
+        latent_t += 1
+    return latent_t, _decoded_frames_for_latent_t(latent_t)
+
+
+def _empty_h3_edit_latent(width: int, height: int, frame_count: int) -> tuple[dict[str, Any], int]:
     from comfy import model_management, nested_tensor
 
+    requested_frames = max(1, int(frame_count))
+    latent_t, natural_frames = _latent_t_for_frame_count(requested_frames)
+    audio_t = max(1, round((natural_frames / FPS) * AUDIO_LATENT_FPS))
     device = model_management.intermediate_device()
-    video = torch.zeros((1, H3_VIDEO_CHANNELS, 1, height // 16, width // 16), device=device)
+    video = torch.zeros((1, H3_VIDEO_CHANNELS, latent_t, height // 16, width // 16), device=device)
     audio = torch.zeros(
-        (1, H3_AUDIO_CHANNELS, H3_AUDIO_STEREO, H3_AUDIO_FRAMES_FOR_ONE_IMAGE),
+        (1, H3_AUDIO_CHANNELS, H3_AUDIO_STEREO, audio_t),
         device=device,
     )
-    return {
-        "samples": nested_tensor.NestedTensor((video, audio)),
-        "h3edit_frame_count": 1,
-        "h3edit_width": width,
-        "h3edit_height": height,
-    }
+    return (
+        {
+            "samples": nested_tensor.NestedTensor((video, audio)),
+            "h3edit_requested_frames": requested_frames,
+            "h3edit_natural_frames": natural_frames,
+            "h3edit_output_frame_index": natural_frames - 1,
+            "h3edit_width": width,
+            "h3edit_height": height,
+        },
+        natural_frames,
+    )
 
 
 class TextEncodeH3Edit:
     """Prepare a native source edit plus an optional native or semantic guide."""
 
     DESCRIPTION = (
-        "One-node MiniMax H3 single-frame edit conditioning. Picture 1 is always the VAE keyframe source. "
-        "Picture 2 can be disabled, Qwen-only semantic conditioning, or a native Qwen+VAE reference."
+        "One-node MiniMax H3 single-image edit conditioning. Picture 1 is always the VAE keyframe source. "
+        "Picture 2 can be disabled, Qwen-only semantic conditioning, or a native Qwen+VAE reference. "
+        "Quality modes use a short hidden temporal packet but still emit one final image."
     )
 
     @classmethod
@@ -286,6 +339,16 @@ class TextEncodeH3Edit:
                     "IMAGE",
                     {"tooltip": "Optional Picture 2 guide. Choose semantic or native transport above."},
                 ),
+                "quality_profile": (
+                    list(QUALITY_PROFILES),
+                    {
+                        "default": QUALITY_RECOMMENDED,
+                        "tooltip": (
+                            "H3 is video-trained. Recommended generates a short 22-frame context and the decoder returns "
+                            "only its completed final frame. True 1-frame mode is faster but often poor quality."
+                        ),
+                    },
+                ),
             },
         }
 
@@ -293,7 +356,7 @@ class TextEncodeH3Edit:
     RETURN_NAMES = ("positive", "latent", "fitted_source", "encoded_prompt", "info")
     OUTPUT_TOOLTIPS = (
         "Positive conditioning with the native source keyframe and selected Picture 2 transport.",
-        "A true one-frame MiniMax H3 audio/video latent.",
+        "An H3 latent with the selected hidden quality context; downstream decode still emits one image.",
         "Picture 1 after fitting to the output canvas.",
         "The exact prompt sent after the visual token blocks.",
         "Reference transport, Qwen size, VAE usage, and checkpoint guidance.",
@@ -315,6 +378,7 @@ class TextEncodeH3Edit:
         semantic_resolution: int,
         native_reference_size: str,
         reference_image: torch.Tensor | None = None,
+        quality_profile: str = QUALITY_RECOMMENDED,
     ):
         import node_helpers
 
@@ -324,6 +388,8 @@ class TextEncodeH3Edit:
             raise ValueError(f"Unknown source_fit: {source_fit}")
         if prompt_mode not in PROMPT_MODES:
             raise ValueError(f"Unknown prompt_mode: {prompt_mode}")
+        if quality_profile not in QUALITY_PROFILES:
+            raise ValueError(f"Unknown quality_profile: {quality_profile}")
         if reference_mode != REFERENCE_NONE and reference_image is None:
             raise ValueError(
                 f"reference_mode is '{reference_mode}', but reference_image is not connected. "
@@ -370,44 +436,46 @@ class TextEncodeH3Edit:
                 "This mixed keyframe+REF path is experimental and needs checkpoint weights that respond to both transports."
             )
 
-        encoded_prompt = _build_prompt(prompt, prompt_mode, reference_mode)
+        requested_frames = QUALITY_PROFILES[quality_profile]
+        latent, natural_frames = _empty_h3_edit_latent(width, height, requested_frames)
+        encoded_prompt = _build_prompt(prompt, prompt_mode, reference_mode, requested_frames)
         tokens = clip.tokenize(encoded_prompt, minimax_ref_items=visual_items)
         conditioning = clip.encode_from_tokens_scheduled(tokens)
         conditioning_values: dict[str, Any] = {
             "minimax_keyframes": [{"resolved_frame_index": 0, "latent": source_latent}],
-            "minimax_frame_count": 1,
+            "minimax_frame_count": natural_frames,
         }
         if ref_blocks:
             conditioning_values["minimax_refs"] = ref_blocks
         conditioning = node_helpers.conditioning_set_values(conditioning, conditioning_values)
 
-        latent = _empty_one_frame_h3_latent(width, height)
         ignored_note = (
             " A connected reference_image is intentionally ignored."
             if reference_mode == REFERENCE_NONE and reference_image is not None
             else ""
         )
         info = (
-            f"Single-frame H3 edit | output {width}x{height} | Picture 1 native frame-zero keyframe "
+            f"Single-image H3 edit | {quality_profile} | internal packet {natural_frames} frames | "
+            f"output {width}x{height} | Picture 1 native frame-zero keyframe "
             f"({tuple(source_latent.shape)}) | {reference_note}{ignored_note} "
-            "The latent contains one video token and decodes to one image on current ComfyUI."
+            "Decode H3 Edit to One Image returns only the completed final still."
         )
         return conditioning, latent, fitted_source, encoded_prompt, info
 
 
 class DecodeH3SingleFrame:
-    """Decode only a true one-token MiniMax H3 video latent."""
+    """Decode an H3 edit packet and return exactly one completed still."""
 
     DESCRIPTION = (
-        "Decodes the video stream from a true one-frame H3 nested latent. Current ComfyUI's native MiniMax H3 VAE "
-        "supports temporal length 1 directly; no frame duplication or selection is performed."
+        "Decodes the video stream from an H3 edit latent and returns exactly one image. Quality profiles select the "
+        "last completed frame from a short hidden packet; experimental true-one-frame input remains supported."
     )
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "samples": ("LATENT", {"tooltip": "Sampled one-frame MiniMax H3 nested latent."}),
+                "samples": ("LATENT", {"tooltip": "Sampled MiniMax H3 edit latent from Text Encode H3 Edit."}),
                 "vae": ("VAE", {"tooltip": "MiniMax H3 video VAE."}),
             }
         }
@@ -419,28 +487,41 @@ class DecodeH3SingleFrame:
 
     def decode(self, samples: dict[str, Any], vae: Any):
         if not isinstance(samples, dict) or "samples" not in samples:
-            raise ValueError("Decode H3 Single Frame expects a LATENT dictionary with a samples entry.")
+            raise ValueError("Decode H3 Edit to One Image expects a LATENT dictionary with a samples entry.")
         packed = samples["samples"]
         video = packed.unbind()[0] if getattr(packed, "is_nested", False) else packed
         if not isinstance(video, torch.Tensor) or video.ndim != 5 or video.shape[1] != H3_VIDEO_CHANNELS:
-            raise ValueError("Decode H3 Single Frame expects H3 video latents shaped [B,24,T,H,W].")
-        if int(video.shape[2]) != 1:
-            raise ValueError(
-                f"Decode H3 Single Frame received temporal latent length {int(video.shape[2])}; expected exactly 1."
-            )
-
+            raise ValueError("Decode H3 Edit to One Image expects H3 video latents shaped [B,24,T,H,W].")
         decoded = vae.decode(video)
         if not isinstance(decoded, torch.Tensor):
             raise ValueError("The MiniMax H3 VAE returned a non-tensor result.")
         if decoded.ndim == 5:
-            if int(decoded.shape[1]) != 1:
-                raise ValueError(f"The H3 VAE decoded {int(decoded.shape[1])} frames; expected exactly 1.")
-            image = decoded[:, 0]
+            decoded_frames = int(decoded.shape[1])
+            frame_index = min(
+                max(0, int(samples.get("h3edit_output_frame_index", decoded_frames - 1))),
+                decoded_frames - 1,
+            )
+            image = decoded[:, frame_index]
         elif decoded.ndim == 4:
-            image = decoded
+            expected_frames = max(1, int(samples.get("h3edit_natural_frames", 1)))
+            if int(video.shape[0]) == 1 and expected_frames > 1 and int(decoded.shape[0]) >= expected_frames:
+                decoded_frames = int(decoded.shape[0])
+                frame_index = min(
+                    max(0, int(samples.get("h3edit_output_frame_index", expected_frames - 1))),
+                    decoded_frames - 1,
+                )
+                image = decoded[frame_index : frame_index + 1]
+            else:
+                decoded_frames = 1
+                frame_index = 0
+                image = decoded
         else:
             raise ValueError(f"Unexpected H3 VAE output shape {tuple(decoded.shape)}.")
-        return image, f"Decoded one native H3 frame from latent shape {tuple(video.shape)} to {tuple(image.shape)}."
+        return (
+            image,
+            f"Decoded H3 latent {tuple(video.shape)} to {decoded_frames} frame(s); returned completed frame "
+            f"{frame_index} as one image {tuple(image.shape)}.",
+        )
 
 
 NODE_CLASS_MAPPINGS = {
@@ -450,5 +531,5 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "TextEncodeH3Edit": "Text Encode H3 Edit",
-    "DecodeH3SingleFrame": "Decode H3 Single Frame",
+    "DecodeH3SingleFrame": "Decode H3 Edit to One Image",
 }

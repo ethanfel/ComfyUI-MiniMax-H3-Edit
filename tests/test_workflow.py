@@ -25,5 +25,7 @@ def test_example_workflow_links_are_internally_consistent():
 
     edit = nodes[6]
     assert edit["widgets_values"][1] == "semantic (Qwen only)"
+    assert edit["widgets_values"][8] == "recommended | 22-frame context -> 1 image"
     assert edit["inputs"][2]["link"] is not None
     assert edit["inputs"][11]["link"] is not None
+    assert edit["inputs"][12]["name"] == "quality_profile"

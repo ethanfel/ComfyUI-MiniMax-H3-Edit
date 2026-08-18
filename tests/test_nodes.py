@@ -9,6 +9,8 @@ import torch
 from h3edit.nodes import (
     NATIVE_SIZE_MATCH,
     PROMPT_EDIT,
+    QUALITY_EXPERIMENTAL,
+    QUALITY_RECOMMENDED,
     REFERENCE_NATIVE,
     REFERENCE_NONE,
     REFERENCE_SEMANTIC,
@@ -50,7 +52,14 @@ class FakeVAE:
 
     def decode(self, latent):
         self.decoded.append(latent)
-        return torch.zeros((latent.shape[0], 1, latent.shape[3] * 16, latent.shape[4] * 16, 3))
+        frame_per_token = (1, 4, 4, 4, 4)
+        frame_count = (
+            1
+            if latent.shape[2] == 1
+            else sum(frame_per_token[index % len(frame_per_token)] for index in range(latent.shape[2]))
+        )
+        values = torch.arange(frame_count, dtype=torch.float32).view(1, frame_count, 1, 1, 1)
+        return values.expand(latent.shape[0], frame_count, latent.shape[3] * 16, latent.shape[4] * 16, 3)
 
 
 @pytest.fixture(autouse=True)
@@ -76,7 +85,12 @@ def _image(height=768, width=512):
     return torch.rand((1, height, width, 3))
 
 
-def _encode(reference_mode, reference_image=None, semantic_resolution=1024):
+def _encode(
+    reference_mode,
+    reference_image=None,
+    semantic_resolution=1024,
+    quality_profile=QUALITY_RECOMMENDED,
+):
     clip = FakeClip()
     vae = FakeVAE()
     output = TextEncodeH3Edit().encode(
@@ -92,6 +106,7 @@ def _encode(reference_mode, reference_image=None, semantic_resolution=1024):
         semantic_resolution=semantic_resolution,
         native_reference_size=NATIVE_SIZE_MATCH,
         reference_image=reference_image,
+        quality_profile=quality_profile,
     )
     return clip, vae, output
 
@@ -122,13 +137,15 @@ def test_semantic_reference_is_qwen_only():
     expected_width, expected_height = semantic_target_size(_image(height=400, width=800), 1024)
     assert semantic_image.shape == (1, expected_height, expected_width, 3)
     metadata = conditioning[0][1]
-    assert metadata["minimax_frame_count"] == 1
+    assert metadata["minimax_frame_count"] == 22
     assert len(metadata["minimax_keyframes"]) == 1
     assert "minimax_refs" not in metadata
     video, audio = latent["samples"].unbind()
-    assert video.shape == (1, 24, 1, 84, 48)
-    assert audio.shape == (1, 32, 2, 2)
+    assert video.shape == (1, 24, 7, 84, 48)
+    assert audio.shape == (1, 32, 2, 37)
+    assert latent["h3edit_output_frame_index"] == 21
     assert "guide VAE encode skipped" in info
+    assert "internal packet 22 frames" in info
 
 
 def test_native_reference_gets_qwen_and_vae_transport():
@@ -166,7 +183,26 @@ def test_enabled_reference_requires_picture_two():
         _encode(REFERENCE_SEMANTIC)
 
 
-def test_single_frame_decode_extracts_video_and_flattens_temporal_axis():
+def test_experimental_profile_retains_true_one_frame_latent():
+    _clip, _vae, (conditioning, latent, _fitted, prompt, info) = _encode(
+        REFERENCE_NONE,
+        quality_profile=QUALITY_EXPERIMENTAL,
+    )
+
+    video, audio = latent["samples"].unbind()
+    assert video.shape == (1, 24, 1, 84, 48)
+    assert audio.shape == (1, 32, 2, 2)
+    assert conditioning[0][1]["minimax_frame_count"] == 1
+    assert "Produce exactly one finished still image" in prompt
+    assert "internal packet 1 frames" in info
+
+
+def test_invalid_quality_profile_is_rejected():
+    with pytest.raises(ValueError, match="Unknown quality_profile"):
+        _encode(REFERENCE_NONE, quality_profile="imaginary")
+
+
+def test_true_one_frame_decode_extracts_video():
     vae = FakeVAE()
     video = torch.zeros((1, 24, 1, 48, 84))
     audio = torch.zeros((1, 32, 2, 2))
@@ -176,13 +212,24 @@ def test_single_frame_decode_extracts_video_and_flattens_temporal_axis():
 
     assert vae.decoded == [video]
     assert image.shape == (1, 768, 1344, 3)
-    assert "Decoded one native H3 frame" in info
+    assert "to 1 frame(s)" in info
+    assert "returned completed frame 0" in info
 
 
-def test_single_frame_decode_rejects_temporal_packets():
+def test_packet_decode_returns_only_the_completed_final_frame():
     vae = FakeVAE()
-    video = torch.zeros((1, 24, 2, 48, 84))
-    audio = torch.zeros((1, 32, 2, 4))
+    video = torch.zeros((1, 24, 7, 48, 84))
+    audio = torch.zeros((1, 32, 2, 37))
+    samples = {
+        "samples": FakeNestedTensor((video, audio)),
+        "h3edit_natural_frames": 22,
+        "h3edit_output_frame_index": 21,
+    }
 
-    with pytest.raises(ValueError, match="expected exactly 1"):
-        DecodeH3SingleFrame().decode({"samples": FakeNestedTensor((video, audio))}, vae)
+    image, info = DecodeH3SingleFrame().decode(samples, vae)
+
+    assert vae.decoded == [video]
+    assert image.shape == (1, 768, 1344, 3)
+    assert torch.all(image == 21)
+    assert "to 22 frame(s)" in info
+    assert "returned completed frame 21" in info

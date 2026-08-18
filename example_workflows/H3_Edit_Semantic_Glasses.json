@@ -108,7 +108,8 @@
         {"name": "prompt_mode", "type": "COMBO", "widget": {"name": "prompt_mode"}, "link": null},
         {"name": "semantic_resolution", "type": "INT", "widget": {"name": "semantic_resolution"}, "link": null},
         {"name": "native_reference_size", "type": "COMBO", "widget": {"name": "native_reference_size"}, "link": null},
-        {"name": "reference_image", "shape": 7, "type": "IMAGE", "link": 6}
+        {"name": "reference_image", "shape": 7, "type": "IMAGE", "link": 6},
+        {"name": "quality_profile", "type": "COMBO", "widget": {"name": "quality_profile"}, "link": null}
       ],
       "outputs": [
         {"name": "positive", "type": "CONDITIONING", "links": [7]},
@@ -126,7 +127,8 @@
         "crop center",
         "edit instruction",
         1024,
-        "match output area"
+        "match output area",
+        "recommended | 22-frame context -> 1 image"
       ]
     },
     {
@@ -298,7 +300,7 @@
   ],
   "groups": [
     {"id": 1, "title": "1 · Pick the source photo and semantic guide", "bounding": [-960, 60, 430, 850], "color": "#3f789e", "font_size": 22, "flags": {}},
-    {"id": 2, "title": "2 · Describe the one-frame edit", "bounding": [-430, -20, 700, 650], "color": "#8f6f40", "font_size": 22, "flags": {}},
+    {"id": 2, "title": "2 · Describe the single-image edit", "bounding": [-430, -20, 700, 650], "color": "#8f6f40", "font_size": 22, "flags": {}},
     {"id": 3, "title": "3 · Native H3 sample and decode", "bounding": [290, -380, 1320, 820], "color": "#456744", "font_size": 22, "flags": {}}
   ],
   "config": {},

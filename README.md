@@ -1,11 +1,13 @@
 # ComfyUI MiniMax H3 Edit
 
-A deliberately small ComfyUI node pack for **one-frame MiniMax H3 photo editing**. It has no Director, hidden state, prompt analyzer, model loader, sampler wrapper, or custom frontend.
+A deliberately small ComfyUI node pack for **single-image MiniMax H3 photo editing**. It has no Director, hidden state, prompt analyzer, model loader, sampler wrapper, or custom frontend.
 
 The pack adds two nodes:
 
-- **Text Encode H3 Edit** — turns a source image, edit instruction, and optional guide into H3 conditioning plus a true one-frame latent.
-- **Decode H3 Single Frame** — decodes that one-frame latent directly with the native H3 video VAE.
+- **Text Encode H3 Edit** — turns a source image, edit instruction, and optional guide into H3 conditioning plus a short, valid H3 temporal packet.
+- **Decode H3 Edit to One Image** — decodes the packet and returns only its completed final frame.
+
+The graph still produces exactly one image. By default, it samples a hidden 22-frame H3 packet because H3 is a video model and a literal one-token latent leaves no post-anchor temporal space for the edit to resolve. The old true-one-frame path remains available as an explicitly experimental, low-quality option.
 
 ## Semantic versus native Picture 2
 
@@ -23,11 +25,25 @@ For “add these glasses to this woman,” connect the woman to `source_image`, 
 
 The native mode is intentionally labeled experimental. ComfyUI's H3 packed layout can carry keyframes and `minimax_refs` together, but the released FL2VA and REF2VA weights were trained for different task presentations. Runtime compatibility does not guarantee that every checkpoint responds well to the mixed transport.
 
-This pack does not add a temporal RoPE-freeze node. A true one-frame latent has one temporal token, so every spatial row of the target already shares the same temporal coordinate; there is no target-frame time variation left to freeze. That kind of patch can still matter for multi-token interpolation, which is outside this pack's scope.
+## Quality profiles
+
+The quality selector changes only the hidden context; every profile still outputs one image.
+
+| Profile | Internal frames | Video latent tokens | Use |
+|---|---:|---:|---|
+| `recommended` | 22 | 7 | Default balance for giving the edit time to settle |
+| `fast` | 5 | 2 | Cheapest model-native short packet |
+| `high` | 39 | 12 | More temporal context at higher sampling cost |
+| `maximum` | 56 | 17 | Most context offered by this pack; watch VRAM and drift |
+| `experimental` | 1 | 1 | Literal one-frame path retained for comparison; often poor quality |
+
+The multi-frame choices follow H3's native `17k + 5` frame grid. The prompt asks for a locked camera and an immediately completed edit held unchanged, and the decoder selects only the final still.
+
+This pack does not freeze temporal RoPE. The quality paths intentionally use H3's natural temporal coordinates so the model can evolve away from the frame-zero source anchor. In true-one-frame mode there is only one target temporal coordinate, so a RoPE freeze would be a no-op.
 
 ## Requirements
 
-- A current ComfyUI build with native MiniMax H3 support, including one-token H3 VAE encode/decode.
+- A current ComfyUI build with native MiniMax H3 support.
 - MiniMax H3 FL2VA diffusion model.
 - MiniMax H3 Qwen3-VL text encoder.
 - MiniMax H3 video VAE.
@@ -51,9 +67,9 @@ Restart ComfyUI. The nodes appear under `MiniMax H3/Edit`.
 2. Connect two `Load Image` nodes to `source_image` and `reference_image` on **Text Encode H3 Edit**.
 3. Choose `semantic (Qwen only)` and describe the specific edit.
 4. Use `ModelSamplingMiniMaxH3`, `BasicGuider`, `RandomNoise`, a sampler and scheduler, and `SamplerCustomAdvanced` as in the normal native H3 graph.
-5. Connect the sampled latent to **Decode H3 Single Frame**, then preview or save its image output.
+5. Connect the sampled latent to **Decode H3 Edit to One Image**, then preview or save its image output.
 
-The example workflow is configured for a one-frame FL2VA edit. Replace its model filenames and input images with files available in your ComfyUI installation.
+The example workflow is configured for a single-image FL2VA edit using the recommended hidden 22-frame context. Replace its model filenames and input images with files available in your ComfyUI installation.
 
 ## Prompt behavior
 
@@ -67,4 +83,4 @@ Add the black acetate glasses from <Picture 2> to the woman. Fit them naturally 
 
 ## License and provenance
 
-MIT. This is an independent implementation built against ComfyUI's public MiniMax H3 conditioning contracts. The experimental one-token approach was interoperability-checked against [ComfyUI-MiniMaxH3-SingleFrame](https://github.com/tori29umai0123/ComfyUI-MiniMaxH3-SingleFrame), but this pack does not copy its unlicensed code.
+MIT. This is an independent implementation built against ComfyUI's public MiniMax H3 conditioning contracts. The experimental one-token fallback was interoperability-checked against [ComfyUI-MiniMaxH3-SingleFrame](https://github.com/tori29umai0123/ComfyUI-MiniMaxH3-SingleFrame), but this pack does not copy its unlicensed code.
