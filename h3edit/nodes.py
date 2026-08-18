@@ -35,6 +35,8 @@ REFERENCE_NONE = "none (source only)"
 REFERENCE_SEMANTIC = "semantic (Qwen only)"
 REFERENCE_NATIVE = "native (Qwen + VAE ref)"
 REFERENCE_MODES = [REFERENCE_SEMANTIC, REFERENCE_NATIVE, REFERENCE_NONE]
+REFERENCE_TRANSPORTS = [REFERENCE_SEMANTIC, REFERENCE_NATIVE]
+REFERENCE_STACK_TYPE = "H3EDIT_REFERENCE_STACK"
 
 PROMPT_EDIT = "edit instruction"
 PROMPT_VERBATIM = "use prompt verbatim"
@@ -176,21 +178,23 @@ def _native_reference_size(
     return _fit_grid_area(source_width, source_height, target_area)
 
 
-def _build_prompt(prompt: str, prompt_mode: str, reference_mode: str, frame_count: int) -> str:
+def _build_prompt(prompt: str, prompt_mode: str, reference_modes: list[str], frame_count: int) -> str:
     prompt = (prompt or "").strip()
     if prompt_mode == PROMPT_VERBATIM:
         return prompt
-    guide = ""
-    if reference_mode == REFERENCE_SEMANTIC:
-        guide = (
-            " <Picture 2> is a semantic visual guide only. Transfer only the requested concept, object, material, "
-            "or attribute from it; do not copy its scene, identity, pose, or composition."
-        )
-    elif reference_mode == REFERENCE_NATIVE:
-        guide = (
-            " <Picture 2> is a native visual reference. Use its detailed appearance only where the requested edit "
-            "calls for it."
-        )
+    guide_parts = []
+    for ordinal, reference_mode in enumerate(reference_modes, start=2):
+        if reference_mode == REFERENCE_SEMANTIC:
+            guide_parts.append(
+                f" <Picture {ordinal}> is a semantic visual guide only. Transfer only the requested concept, object, "
+                "material, or attribute from it; do not copy its scene, identity, pose, or composition."
+            )
+        elif reference_mode == REFERENCE_NATIVE:
+            guide_parts.append(
+                f" <Picture {ordinal}> is a native visual reference. Use its detailed appearance only where the "
+                "requested edit calls for it."
+            )
+    guide = "".join(guide_parts)
     still_contract = (
         " Produce exactly one finished still image."
         if frame_count == 1
@@ -307,13 +311,111 @@ def _stable_quality_frame(frames: torch.Tensor, max_side: int = 512) -> tuple[in
     return selected, float(scores[selected].item())
 
 
+class AddH3EditReference:
+    """Build an ordered, chainable list of semantic and native edit references."""
+
+    DESCRIPTION = (
+        "Adds one image or IMAGE batch to an ordered H3 Edit reference stack. Chain as many nodes as needed; every "
+        "entry independently declares semantic Qwen-only or native Qwen+VAE transport."
+    )
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": (
+                    "IMAGE",
+                    {"tooltip": "Reference image(s) appended in batch order as the next <Picture N> entries."},
+                ),
+                "transport": (
+                    REFERENCE_TRANSPORTS,
+                    {
+                        "default": REFERENCE_SEMANTIC,
+                        "tooltip": "Semantic skips the guide VAE; native also creates a minimax_refs latent.",
+                    },
+                ),
+                "semantic_resolution": (
+                    "INT",
+                    {
+                        "default": 1024,
+                        "min": 256,
+                        "max": MAX_SEMANTIC_RESOLUTION,
+                        "step": 32,
+                        "tooltip": "Equivalent-square Qwen budget used when transport is semantic.",
+                    },
+                ),
+                "native_reference_size": (
+                    NATIVE_SIZE_MODES,
+                    {
+                        "default": NATIVE_SIZE_MATCH,
+                        "tooltip": "VAE resize policy used when transport is native.",
+                    },
+                ),
+            },
+            "optional": {
+                "previous_references": (
+                    REFERENCE_STACK_TYPE,
+                    {"tooltip": "Connect the previous Add H3 Edit Reference node to keep appending in order."},
+                ),
+            },
+        }
+
+    RETURN_TYPES = (REFERENCE_STACK_TYPE, "STRING")
+    RETURN_NAMES = ("references", "info")
+    FUNCTION = "add"
+    CATEGORY = CATEGORY
+
+    def add(
+        self,
+        image: torch.Tensor,
+        transport: str,
+        semantic_resolution: int,
+        native_reference_size: str,
+        previous_references: tuple[dict[str, Any], ...] | None = None,
+    ):
+        if transport not in REFERENCE_TRANSPORTS:
+            raise ValueError(f"Unknown reference transport: {transport}")
+        if native_reference_size not in NATIVE_SIZE_MODES:
+            raise ValueError(f"Unknown native_reference_size: {native_reference_size}")
+        if not isinstance(image, torch.Tensor) or image.ndim != 4 or image.shape[0] < 1:
+            raise ValueError("image must be a non-empty ComfyUI IMAGE tensor [B,H,W,C].")
+        if image.shape[1] < 1 or image.shape[2] < 1 or image.shape[3] < 3:
+            raise ValueError(f"image has invalid image dimensions {tuple(image.shape)}.")
+
+        previous = tuple(previous_references or ())
+        if any(not isinstance(item, dict) or "image" not in item or "transport" not in item for item in previous):
+            raise ValueError("previous_references is not a valid H3 Edit reference stack.")
+        additions = tuple(
+            {
+                "image": image[index : index + 1, ..., :3],
+                "transport": transport,
+                "semantic_resolution": int(semantic_resolution),
+                "native_reference_size": native_reference_size,
+            }
+            for index in range(int(image.shape[0]))
+        )
+        result = previous + additions
+        first_position = len(previous) + 1
+        last_position = len(result)
+        position_text = (
+            f"stack position {first_position}"
+            if first_position == last_position
+            else f"stack positions {first_position} through {last_position}"
+        )
+        return (
+            result,
+            f"Added {len(additions)} {transport} reference(s) at {position_text}; stack now contains {len(result)} "
+            "guide(s). Text Encode assigns final <Picture N> ordinals after its optional direct reference.",
+        )
+
+
 class TextEncodeH3Edit:
     """Prepare a native source edit plus an optional native or semantic guide."""
 
     DESCRIPTION = (
         "One-node MiniMax H3 single-image edit conditioning. Picture 1 is always the VAE keyframe source. "
-        "Picture 2 can be disabled, Qwen-only semantic conditioning, or a native Qwen+VAE reference. "
-        "Quality modes use a short hidden temporal packet but still emit one final image."
+        "The direct Picture 2 guide and an unlimited ordered reference stack can independently use Qwen-only semantic "
+        "or native Qwen+VAE transport. Quality modes use a short hidden temporal packet but emit one final image."
     )
 
     @classmethod
@@ -403,13 +505,22 @@ class TextEncodeH3Edit:
                         ),
                     },
                 ),
+                "reference_stack": (
+                    REFERENCE_STACK_TYPE,
+                    {
+                        "tooltip": (
+                            "Optional ordered guides from chained Add H3 Edit Reference nodes. These follow the direct "
+                            "reference_image and become the next <Picture N> entries."
+                        )
+                    },
+                ),
             },
         }
 
     RETURN_TYPES = ("CONDITIONING", "LATENT", "IMAGE", "STRING", "STRING")
     RETURN_NAMES = ("positive", "latent", "fitted_source", "encoded_prompt", "info")
     OUTPUT_TOOLTIPS = (
-        "Positive conditioning with the native source keyframe and selected Picture 2 transport.",
+        "Positive conditioning with the native source keyframe and every ordered guide transport.",
         "An H3 latent with the selected hidden quality context; downstream decode still emits one image.",
         "Picture 1 after fitting to the output canvas.",
         "The exact prompt sent after the visual token blocks.",
@@ -433,6 +544,7 @@ class TextEncodeH3Edit:
         native_reference_size: str,
         reference_image: torch.Tensor | None = None,
         quality_profile: str = QUALITY_RECOMMENDED,
+        reference_stack: tuple[dict[str, Any], ...] | None = None,
     ):
         import node_helpers
 
@@ -444,11 +556,6 @@ class TextEncodeH3Edit:
             raise ValueError(f"Unknown prompt_mode: {prompt_mode}")
         if quality_profile not in QUALITY_PROFILES:
             raise ValueError(f"Unknown quality_profile: {quality_profile}")
-        if reference_mode != REFERENCE_NONE and reference_image is None:
-            raise ValueError(
-                f"reference_mode is '{reference_mode}', but reference_image is not connected. "
-                f"Connect Picture 2 or choose '{REFERENCE_NONE}'."
-            )
 
         width = _round_dimension(width)
         height = _round_dimension(height)
@@ -457,42 +564,94 @@ class TextEncodeH3Edit:
 
         visual_items = [{"type": "image", "data": fitted_source}]
         ref_blocks: list[dict[str, Any]] = []
-        reference_note = "Picture 2 disabled; only Picture 1 is presented to Qwen."
-
-        if reference_mode == REFERENCE_SEMANTIC:
-            semantic_width, semantic_height = semantic_target_size(reference_image, semantic_resolution)
-            prepared_reference = _resize_exact(reference_image, semantic_width, semantic_height)
-            visual_items.append({"type": "image", "data": prepared_reference})
-            reference_note = (
-                f"Picture 2 semantic Qwen-only at {semantic_width}x{semantic_height}; guide VAE encode skipped and "
-                "no minimax_refs block attached. Use an FL2VA edit checkpoint."
-            )
-        elif reference_mode == REFERENCE_NATIVE:
-            native_width, native_height = _native_reference_size(
-                reference_image,
-                width,
-                height,
-                native_reference_size,
-            )
-            prepared_reference = _resize_exact(reference_image, native_width, native_height)
-            reference_latent = vae.encode(prepared_reference)
-            visual_items.append({"type": "image", "data": prepared_reference})
-            ref_blocks.append(
+        reference_specs: list[dict[str, Any]] = []
+        ignored_direct = reference_mode == REFERENCE_NONE and reference_image is not None
+        if reference_image is not None and reference_mode != REFERENCE_NONE:
+            reference_specs.append(
                 {
-                    "kind": "image",
-                    "latent_h": native_height // 16,
-                    "latent_w": native_width // 16,
-                    "latent": reference_latent,
+                    "image": _validate_image(reference_image, "reference_image"),
+                    "transport": reference_mode,
+                    "semantic_resolution": int(semantic_resolution),
+                    "native_reference_size": native_reference_size,
                 }
             )
+
+        if reference_stack is not None:
+            if not isinstance(reference_stack, (tuple, list)):
+                raise ValueError("reference_stack is not a valid H3 Edit reference stack.")
+            for stack_index, item in enumerate(reference_stack):
+                if not isinstance(item, dict):
+                    raise ValueError(f"reference_stack item {stack_index} is invalid.")
+                transport = item.get("transport")
+                if transport not in REFERENCE_TRANSPORTS:
+                    raise ValueError(f"reference_stack item {stack_index} has unknown transport: {transport}")
+                size_mode = item.get("native_reference_size", NATIVE_SIZE_MATCH)
+                if size_mode not in NATIVE_SIZE_MODES:
+                    raise ValueError(f"reference_stack item {stack_index} has unknown native size mode: {size_mode}")
+                reference_specs.append(
+                    {
+                        "image": _validate_image(item.get("image"), f"reference_stack[{stack_index}].image"),
+                        "transport": transport,
+                        "semantic_resolution": int(item.get("semantic_resolution", semantic_resolution)),
+                        "native_reference_size": size_mode,
+                    }
+                )
+
+        reference_notes = []
+        semantic_count = 0
+        native_count = 0
+        for ordinal, item in enumerate(reference_specs, start=2):
+            reference = item["image"]
+            if item["transport"] == REFERENCE_SEMANTIC:
+                semantic_width, semantic_height = semantic_target_size(reference, item["semantic_resolution"])
+                prepared_reference = _resize_exact(reference, semantic_width, semantic_height)
+                visual_items.append({"type": "image", "data": prepared_reference})
+                semantic_count += 1
+                reference_notes.append(
+                    f"Picture {ordinal} semantic Qwen-only {semantic_width}x{semantic_height} (VAE skipped)"
+                )
+            else:
+                native_width, native_height = _native_reference_size(
+                    reference,
+                    width,
+                    height,
+                    item["native_reference_size"],
+                )
+                prepared_reference = _resize_exact(reference, native_width, native_height)
+                reference_latent = vae.encode(prepared_reference)
+                visual_items.append({"type": "image", "data": prepared_reference})
+                ref_blocks.append(
+                    {
+                        "kind": "image",
+                        "latent_h": native_height // 16,
+                        "latent_w": native_width // 16,
+                        "latent": reference_latent,
+                    }
+                )
+                native_count += 1
+                reference_notes.append(f"Picture {ordinal} native Qwen+VAE {native_width}x{native_height}")
+
+        if reference_notes:
             reference_note = (
-                f"Picture 2 native Qwen+VAE at {native_width}x{native_height}; one minimax_refs block attached. "
-                "This mixed keyframe+REF path is experimental and needs checkpoint weights that respond to both transports."
+                f"{len(reference_specs)} ordered guide(s): " + "; ".join(reference_notes) + ". "
+                f"Semantic={semantic_count}; native={native_count}. Use an FL2VA edit checkpoint."
             )
+            if native_count:
+                reference_note += (
+                    " Native guide minimax_refs mixed with the frame-zero keyframe are experimental and require "
+                    "weights that respond to both transports."
+                )
+        else:
+            reference_note = "No guide references; only Picture 1 is presented to Qwen."
 
         requested_frames = QUALITY_PROFILES[quality_profile]
         latent, natural_frames = _empty_h3_edit_latent(width, height, requested_frames)
-        encoded_prompt = _build_prompt(prompt, prompt_mode, reference_mode, requested_frames)
+        encoded_prompt = _build_prompt(
+            prompt,
+            prompt_mode,
+            [item["transport"] for item in reference_specs],
+            requested_frames,
+        )
         tokens = clip.tokenize(encoded_prompt, minimax_ref_items=visual_items)
         conditioning = clip.encode_from_tokens_scheduled(tokens)
         conditioning_values: dict[str, Any] = {
@@ -503,11 +662,7 @@ class TextEncodeH3Edit:
             conditioning_values["minimax_refs"] = ref_blocks
         conditioning = node_helpers.conditioning_set_values(conditioning, conditioning_values)
 
-        ignored_note = (
-            " A connected reference_image is intentionally ignored."
-            if reference_mode == REFERENCE_NONE and reference_image is not None
-            else ""
-        )
+        ignored_note = " The direct reference_image is intentionally ignored." if ignored_direct else ""
         info = (
             f"Single-image H3 edit | {quality_profile} | requested context {requested_frames} frames | "
             f"natural packet {natural_frames} frames | "
@@ -578,11 +733,13 @@ class DecodeH3SingleFrame:
 
 
 NODE_CLASS_MAPPINGS = {
+    "AddH3EditReference": AddH3EditReference,
     "TextEncodeH3Edit": TextEncodeH3Edit,
     "DecodeH3SingleFrame": DecodeH3SingleFrame,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "AddH3EditReference": "Add H3 Edit Reference",
     "TextEncodeH3Edit": "Text Encode H3 Edit",
     "DecodeH3SingleFrame": "Decode H3 Edit to One Image",
 }

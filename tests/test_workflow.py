@@ -29,3 +29,4 @@ def test_example_workflow_links_are_internally_consistent():
     assert edit["inputs"][2]["link"] is not None
     assert edit["inputs"][11]["link"] is not None
     assert edit["inputs"][12]["name"] == "quality_profile"
+    assert edit["inputs"][13]["name"] == "reference_stack"

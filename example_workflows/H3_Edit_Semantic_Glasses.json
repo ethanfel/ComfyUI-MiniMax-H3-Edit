@@ -109,7 +109,8 @@
         {"name": "semantic_resolution", "type": "INT", "widget": {"name": "semantic_resolution"}, "link": null},
         {"name": "native_reference_size", "type": "COMBO", "widget": {"name": "native_reference_size"}, "link": null},
         {"name": "reference_image", "shape": 7, "type": "IMAGE", "link": 6},
-        {"name": "quality_profile", "type": "COMBO", "widget": {"name": "quality_profile"}, "link": null}
+        {"name": "quality_profile", "type": "COMBO", "widget": {"name": "quality_profile"}, "link": null},
+        {"name": "reference_stack", "shape": 7, "type": "H3EDIT_REFERENCE_STACK", "link": null}
       ],
       "outputs": [
         {"name": "positive", "type": "CONDITIONING", "links": [7]},

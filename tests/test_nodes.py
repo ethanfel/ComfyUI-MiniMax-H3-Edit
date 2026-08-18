@@ -15,6 +15,7 @@ from h3edit.nodes import (
     REFERENCE_NATIVE,
     REFERENCE_NONE,
     REFERENCE_SEMANTIC,
+    AddH3EditReference,
     DecodeH3SingleFrame,
     TextEncodeH3Edit,
     semantic_target_size,
@@ -91,6 +92,7 @@ def _encode(
     reference_image=None,
     semantic_resolution=1024,
     quality_profile=QUALITY_RECOMMENDED,
+    reference_stack=None,
 ):
     clip = FakeClip()
     vae = FakeVAE()
@@ -108,6 +110,7 @@ def _encode(
         native_reference_size=NATIVE_SIZE_MATCH,
         reference_image=reference_image,
         quality_profile=quality_profile,
+        reference_stack=reference_stack,
     )
     return clip, vae, output
 
@@ -146,7 +149,7 @@ def test_semantic_reference_is_qwen_only():
     assert audio.shape == (1, 32, 2, 8)
     assert latent["h3edit_requested_frames"] == 5
     assert latent["h3edit_natural_frames"] == 5
-    assert "guide VAE encode skipped" in info
+    assert "VAE skipped" in info
     assert "requested context 5 frames" in info
     assert "natural packet 5 frames" in info
 
@@ -166,7 +169,7 @@ def test_native_reference_gets_qwen_and_vae_transport():
     assert ref["kind"] == "image"
     assert ref["latent_h"] == vae.encoded[1].shape[1] // 16
     assert ref["latent_w"] == vae.encoded[1].shape[2] // 16
-    assert "mixed keyframe+REF path is experimental" in info
+    assert "mixed with the frame-zero keyframe are experimental" in info
 
 
 def test_none_mode_can_leave_reference_socket_connected():
@@ -181,9 +184,62 @@ def test_none_mode_can_leave_reference_socket_connected():
     assert "intentionally ignored" in info
 
 
-def test_enabled_reference_requires_picture_two():
-    with pytest.raises(ValueError, match="reference_image is not connected"):
-        _encode(REFERENCE_SEMANTIC)
+def test_enabled_direct_mode_without_picture_two_runs_source_only():
+    clip, vae, (conditioning, _latent, _fitted, prompt, info) = _encode(REFERENCE_SEMANTIC)
+
+    assert len(vae.encoded) == 1
+    assert len(clip.tokenize_calls[0][1]["minimax_ref_items"]) == 1
+    assert "<Picture 2>" not in prompt
+    assert "minimax_refs" not in conditioning[0][1]
+    assert "No guide references" in info
+
+
+def test_chainable_reference_stack_preserves_picture_order_and_per_ref_transport():
+    builder = AddH3EditReference()
+    semantic_stack, semantic_info = builder.add(
+        image=_image(height=400, width=800),
+        transport=REFERENCE_SEMANTIC,
+        semantic_resolution=768,
+        native_reference_size=NATIVE_SIZE_MATCH,
+    )
+    mixed_stack, native_info = builder.add(
+        image=_image(height=900, width=600),
+        transport=REFERENCE_NATIVE,
+        semantic_resolution=1024,
+        native_reference_size=NATIVE_SIZE_MATCH,
+        previous_references=semantic_stack,
+    )
+
+    assert len(mixed_stack) == 2
+    assert [item["transport"] for item in mixed_stack] == [REFERENCE_SEMANTIC, REFERENCE_NATIVE]
+    assert "stack position 1" in semantic_info
+    assert "stack position 2" in native_info
+
+    clip, vae, (conditioning, _latent, _fitted, prompt, info) = _encode(
+        REFERENCE_NONE,
+        reference_stack=mixed_stack,
+    )
+
+    assert len(clip.tokenize_calls[0][1]["minimax_ref_items"]) == 3
+    assert len(vae.encoded) == 2
+    assert "<Picture 2> is a semantic visual guide only" in prompt
+    assert "<Picture 3> is a native visual reference" in prompt
+    assert len(conditioning[0][1]["minimax_refs"]) == 1
+    assert "Semantic=1; native=1" in info
+
+
+def test_reference_builder_expands_an_image_batch_in_order():
+    image_batch = torch.rand((3, 128, 256, 3))
+    references, info = AddH3EditReference().add(
+        image=image_batch,
+        transport=REFERENCE_SEMANTIC,
+        semantic_resolution=512,
+        native_reference_size=NATIVE_SIZE_MATCH,
+    )
+
+    assert len(references) == 3
+    assert all(item["image"].shape == (1, 128, 256, 3) for item in references)
+    assert "stack positions 1 through 3" in info
 
 
 def test_experimental_profile_retains_true_one_frame_latent():
