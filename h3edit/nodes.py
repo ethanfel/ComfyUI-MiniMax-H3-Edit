@@ -23,13 +23,26 @@ QUALITY_EXTENDED = "extended | 9-frame context -> 1 image"
 QUALITY_HIGH = "high | 13-frame context -> 1 image"
 QUALITY_MAXIMUM = "maximum | 20-frame context -> 1 image"
 QUALITY_EXPERIMENTAL = "experimental | true 1 frame (low quality)"
+QUALITY_CHARACTER_FOUR = "character sheet | 4 panels / 73-frame orbit"
+QUALITY_CHARACTER_SIX = "character sheet | 6 panels / 124-frame orbit"
 QUALITY_PROFILES = {
     QUALITY_RECOMMENDED: 5,
     QUALITY_EXTENDED: 9,
     QUALITY_HIGH: 13,
     QUALITY_MAXIMUM: 20,
     QUALITY_EXPERIMENTAL: 1,
+    QUALITY_CHARACTER_FOUR: 73,
+    QUALITY_CHARACTER_SIX: 124,
 }
+CHARACTER_SHEET_FRAME_INDICES = {
+    QUALITY_CHARACTER_FOUR: (2, 24, 45, 68),
+    QUALITY_CHARACTER_SIX: (2, 21, 42, 63, 84, 113),
+}
+CHARACTER_SHEET_AUTO = "auto from encoded profile"
+CHARACTER_SHEET_FOUR = "4 panels | 2x2"
+CHARACTER_SHEET_SIX = "6 panels | 3x2"
+CHARACTER_SHEET_LAYOUTS = [CHARACTER_SHEET_AUTO, CHARACTER_SHEET_FOUR, CHARACTER_SHEET_SIX]
+GUTTER_COLORS = ["black", "neutral gray", "white"]
 
 REFERENCE_NONE = "none (source only)"
 REFERENCE_SEMANTIC = "semantic (Qwen only)"
@@ -207,6 +220,86 @@ def _guide_contract(ordinal: int, reference_mode: str, *, generation: bool) -> s
     return ""
 
 
+def _build_character_sheet_prompt(
+    prompt: str,
+    reference_modes: list[str],
+    primary_image_role: str,
+    frame_count: int,
+) -> str:
+    primary_transport = (
+        REFERENCE_SEMANTIC if primary_image_role == PRIMARY_SEMANTIC_REFERENCE else REFERENCE_NATIVE
+    )
+    picture_modes = [primary_transport, *reference_modes]
+    transport_contract = " ".join(
+        _guide_contract(ordinal, reference_mode, generation=True).strip()
+        for ordinal, reference_mode in enumerate(picture_modes, start=1)
+    )
+
+    if frame_count == 73:
+        summary = (
+            "[reference generation] The target video presents <Subject 1> as one coherent character in a silent "
+            "three-second studio turntable: a front view, left profile, back view, and final front facial close-up."
+        )
+        retention = (
+            "<Subject 1> (appears in [Shot 1] and [Shot 2]): fully_preserved - preserve the requested identity, "
+            "facial structure, anatomy, hairstyle, costume construction, materials, colors, accessories, and props "
+            "without drift between angles; exclude every source background, source pose, and unrequested person."
+        )
+        detail = (
+            "The target uses the requested visual style with sharp facial and costume detail, a solid uniform light-gray "
+            "seamless backdrop, soft even form lighting, no cast or contact shadows, and a long telephoto near-orthographic "
+            "view. [Shot 1] <Subject 1> stands centered in a relaxed neutral A-pose, feet shoulder-width apart, arms slightly "
+            "clear of the torso, palms toward the thighs, head level, eyes open, and expression neutral. The character is "
+            "rigidly motionless like a statue. Hair, cloth, armor, straps, jewelry, loose accessories, and props remain locked "
+            "in exactly the same configuration. From 00:00.000 to 00:02.000 the camera performs one smooth constant-speed "
+            "180-degree orbit from square front, through the character's left profile, to square back. Framing, scale, "
+            "lighting, proportions, surface details, and wardrobe construction remain identical throughout; there is no "
+            "breathing, blinking, wind, fabric motion, secondary motion, zoom, roll, shake, or motion blur. [Shot 2] At "
+            "00:02.000, the camera rapidly returns to the front and pushes into a locked head-and-shoulders close-up while "
+            "<Subject 1> remains unchanged, face square to camera and eyes toward the lens. The close-up settles sharply "
+            "before 00:03.000."
+        )
+    else:
+        summary = (
+            "[reference generation] The target video presents <Subject 1> as one coherent character in a silent five-second "
+            "studio turntable: front, left, back, and right full-body views followed by front and three-quarter facial views."
+        )
+        retention = (
+            "<Subject 1> (appears in [Shot 1], [Shot 2], and [Shot 3]): fully_preserved - preserve the requested identity, "
+            "facial structure, anatomy, hairstyle, costume construction, materials, colors, accessories, and props without "
+            "drift across the complete orbit and both facial views; exclude every source background, source pose, and "
+            "unrequested person."
+        )
+        detail = (
+            "The target uses the requested visual style with sharp facial and costume detail, a solid uniform light-gray "
+            "seamless backdrop, soft even form lighting, no cast or contact shadows, and a long telephoto near-orthographic "
+            "view. [Shot 1] <Subject 1> stands centered in a relaxed neutral A-pose, feet shoulder-width apart, arms slightly "
+            "clear of the torso, palms toward the thighs, head level, eyes open, and expression neutral. The character is "
+            "rigidly motionless like a statue. Hair, cloth, armor, straps, jewelry, loose accessories, and props remain locked "
+            "in exactly the same configuration. From 00:00.000 to 00:03.000 the camera performs one smooth constant-speed "
+            "360-degree orbit, beginning square on the front, passing the left profile at one quarter turn, reaching the back "
+            "at halfway, passing the right profile at three quarters, and returning to the front. Framing, scale, lighting, "
+            "proportions, surface details, and wardrobe construction remain identical throughout; there is no breathing, "
+            "blinking, wind, fabric motion, secondary motion, zoom, roll, shake, or motion blur. [Shot 2] At 00:03.000, the "
+            "camera rapidly pushes into a locked head-and-shoulders close-up while <Subject 1> remains unchanged, face square "
+            "to camera and eyes toward the lens. The front facial view settles sharply before 00:04.000. [Shot 3] At "
+            "00:04.000, the camera rapidly repositions to a clean three-quarter head-and-shoulders angle. <Subject 1> keeps "
+            "the same identity, neutral expression, hairstyle, costume neckline, and lighting while the final facial view "
+            "settles sharply before 00:05.000."
+        )
+
+    return (
+        "subject_definitions:\n"
+        "<Subject 1> is the single coherent character assembled from the ordered reference pictures according to these "
+        f"assignments: {prompt}\n{transport_contract}\n\n"
+        f"summary:\n{summary}\n\n"
+        f"retention_analysis:\n{retention}\n\n"
+        f"detailed_description:\n{detail}\n\n"
+        "overall_soundscape:\nSilence; no dialogue, ambience, Foley, room tone, or movement sounds.\n\n"
+        "non_diegetic_music:\nN/A"
+    )
+
+
 def _build_prompt(
     prompt: str,
     prompt_mode: str,
@@ -217,6 +310,9 @@ def _build_prompt(
     prompt = (prompt or "").strip()
     if prompt_mode == PROMPT_VERBATIM:
         return prompt
+
+    if frame_count in {73, 124}:
+        return _build_character_sheet_prompt(prompt, reference_modes, primary_image_role, frame_count)
 
     if primary_image_role == PRIMARY_EDIT_ANCHOR:
         guide = "".join(
@@ -565,7 +661,8 @@ class TextEncodeH3Edit:
                         "default": QUALITY_RECOMMENDED,
                         "tooltip": (
                             "H3 is video-trained. Recommended matches Studio's short 5-frame context, then the decoder "
-                            "automatically returns one stable high-quality frame. True 1-frame mode is often poor quality."
+                            "returns one stable frame. Character-sheet profiles create calibrated 73/124-frame orbits for "
+                            "the dedicated sheet decoder. True 1-frame mode is often poor quality."
                         ),
                     },
                 ),
@@ -585,7 +682,7 @@ class TextEncodeH3Edit:
     RETURN_NAMES = ("positive", "latent", "fitted_source", "encoded_prompt", "info")
     OUTPUT_TOOLTIPS = (
         "Positive conditioning with the selected Picture 1 role and every ordered guide transport.",
-        "An H3 latent with the selected hidden quality context; downstream decode still emits one image.",
+        "An H3 latent with the selected still or character-sheet temporal profile.",
         "Picture 1 after preparation for its selected anchor/reference role.",
         "The exact prompt sent after the visual token blocks.",
         "Reference transport, Qwen size, VAE usage, and checkpoint guidance.",
@@ -623,6 +720,10 @@ class TextEncodeH3Edit:
             raise ValueError(f"Unknown prompt_mode: {prompt_mode}")
         if quality_profile not in QUALITY_PROFILES:
             raise ValueError(f"Unknown quality_profile: {quality_profile}")
+        if quality_profile in CHARACTER_SHEET_FRAME_INDICES and primary_image_role == PRIMARY_EDIT_ANCHOR:
+            raise ValueError(
+                "Character-sheet profiles require semantic or native generation mode; Picture 1 cannot be a frame anchor."
+            )
 
         width = _round_dimension(width)
         height = _round_dimension(height)
@@ -771,13 +872,79 @@ class TextEncodeH3Edit:
         else:
             route = "REF2VA" if native_count else "FL2VA"
             mode_note = f"Reference-driven generation | no frame-zero keyframe | expected route {route}"
+        decoder_note = (
+            "Decode H3 Character Sheet extracts the calibrated views and returns a stitched sheet."
+            if quality_profile in CHARACTER_SHEET_FRAME_INDICES
+            else "Decode H3 Edit to One Image scores the decoded context and returns one stable high-quality still."
+        )
         info = (
             f"{mode_note} | {quality_profile} | requested context {requested_frames} frames | "
             f"natural packet {natural_frames} frames | "
             f"output {width}x{height} | {reference_note}{ignored_note} "
-            "Decode H3 Edit to One Image scores the decoded context and returns one stable high-quality still."
+            f"{decoder_note}"
         )
         return conditioning, latent, fitted_source, encoded_prompt, info
+
+
+def _decode_h3_frames(
+    samples: dict[str, Any],
+    vae: Any,
+    caller: str,
+) -> tuple[torch.Tensor, torch.Tensor, int]:
+    if not isinstance(samples, dict) or "samples" not in samples:
+        raise ValueError(f"{caller} expects a LATENT dictionary with a samples entry.")
+    packed = samples["samples"]
+    video = packed.unbind()[0] if getattr(packed, "is_nested", False) else packed
+    if not isinstance(video, torch.Tensor) or video.ndim != 5 or video.shape[1] != H3_VIDEO_CHANNELS:
+        raise ValueError(f"{caller} expects H3 video latents shaped [B,24,T,H,W].")
+    decoded = vae.decode(video)
+    if not isinstance(decoded, torch.Tensor):
+        raise ValueError("The MiniMax H3 VAE returned a non-tensor result.")
+    if decoded.ndim == 5:
+        decoded_frames = int(decoded.shape[1])
+        frames = decoded[0]
+    elif decoded.ndim == 4:
+        expected_frames = max(1, int(samples.get("h3edit_natural_frames", 1)))
+        if int(video.shape[0]) == 1 and expected_frames > 1 and int(decoded.shape[0]) >= expected_frames:
+            decoded_frames = int(decoded.shape[0])
+            frames = decoded
+        else:
+            decoded_frames = 1
+            frames = decoded[:1]
+    else:
+        raise ValueError(f"Unexpected H3 VAE output shape {tuple(decoded.shape)}.")
+    return video, frames, decoded_frames
+
+
+def _stitch_character_panels(
+    panels: torch.Tensor,
+    columns: int,
+    gutter_px: int,
+    gutter_value: float,
+) -> torch.Tensor:
+    if panels.ndim != 4 or int(panels.shape[0]) < 1:
+        raise ValueError("Character-sheet panels must be a non-empty IMAGE batch [N,H,W,C].")
+    panel_count, height, width, channels = (int(value) for value in panels.shape)
+    if panel_count % columns:
+        raise ValueError(f"Cannot place {panel_count} panels into a {columns}-column grid.")
+    gutter_px = max(0, int(gutter_px))
+    row_images = []
+    for row_start in range(0, panel_count, columns):
+        pieces = []
+        for column in range(columns):
+            if column and gutter_px:
+                pieces.append(panels.new_full((height, gutter_px, channels), gutter_value))
+            pieces.append(panels[row_start + column])
+        row_images.append(torch.cat(pieces, dim=1))
+    if len(row_images) == 1:
+        return row_images[0].unsqueeze(0)
+    sheet_parts = []
+    stitched_width = columns * width + (columns - 1) * gutter_px
+    for row_index, row in enumerate(row_images):
+        if row_index and gutter_px:
+            sheet_parts.append(panels.new_full((gutter_px, stitched_width, channels), gutter_value))
+        sheet_parts.append(row)
+    return torch.cat(sheet_parts, dim=0).unsqueeze(0)
 
 
 class DecodeH3SingleFrame:
@@ -803,28 +970,7 @@ class DecodeH3SingleFrame:
     CATEGORY = CATEGORY
 
     def decode(self, samples: dict[str, Any], vae: Any):
-        if not isinstance(samples, dict) or "samples" not in samples:
-            raise ValueError("Decode H3 Edit to One Image expects a LATENT dictionary with a samples entry.")
-        packed = samples["samples"]
-        video = packed.unbind()[0] if getattr(packed, "is_nested", False) else packed
-        if not isinstance(video, torch.Tensor) or video.ndim != 5 or video.shape[1] != H3_VIDEO_CHANNELS:
-            raise ValueError("Decode H3 Edit to One Image expects H3 video latents shaped [B,24,T,H,W].")
-        decoded = vae.decode(video)
-        if not isinstance(decoded, torch.Tensor):
-            raise ValueError("The MiniMax H3 VAE returned a non-tensor result.")
-        if decoded.ndim == 5:
-            decoded_frames = int(decoded.shape[1])
-            frames = decoded[0]
-        elif decoded.ndim == 4:
-            expected_frames = max(1, int(samples.get("h3edit_natural_frames", 1)))
-            if int(video.shape[0]) == 1 and expected_frames > 1 and int(decoded.shape[0]) >= expected_frames:
-                decoded_frames = int(decoded.shape[0])
-                frames = decoded
-            else:
-                decoded_frames = 1
-                frames = decoded[:1]
-        else:
-            raise ValueError(f"Unexpected H3 VAE output shape {tuple(decoded.shape)}.")
+        video, frames, decoded_frames = _decode_h3_frames(samples, vae, "Decode H3 Edit to One Image")
 
         requested_frames = max(1, int(samples.get("h3edit_requested_frames", decoded_frames)))
         candidate_count = min(requested_frames, decoded_frames)
@@ -839,14 +985,97 @@ class DecodeH3SingleFrame:
         )
 
 
+class DecodeH3CharacterSheet:
+    """Decode an H3 orbit, extract calibrated views, and stitch one character sheet."""
+
+    DESCRIPTION = (
+        "Decodes a 73- or 124-frame H3 character orbit, extracts the calibrated four or six views, and stitches a 2x2 "
+        "or 3x2 sheet. Also returns the selected views and full decoded frame batch."
+    )
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "samples": ("LATENT", {"tooltip": "Sampled H3 character-sheet latent from Text Encode H3 Edit / Generate."}),
+                "vae": ("VAE", {"tooltip": "MiniMax H3 video VAE."}),
+                "layout": (
+                    CHARACTER_SHEET_LAYOUTS,
+                    {"default": CHARACTER_SHEET_AUTO, "tooltip": "Auto reads the encoded 73/124-frame profile."},
+                ),
+                "gutter_px": ("INT", {"default": 6, "min": 0, "max": 256, "step": 1}),
+                "gutter_color": (GUTTER_COLORS, {"default": "black"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "STRING")
+    RETURN_NAMES = ("sheet", "selected_views", "all_frames", "info")
+    OUTPUT_TOOLTIPS = (
+        "One stitched 2x2 or 3x2 character sheet.",
+        "The four or six calibrated views as an IMAGE batch.",
+        "Every decoded orbit frame for manual inspection or alternate picks.",
+        "Resolved layout, decoded frame count, extraction indices, and output size.",
+    )
+    FUNCTION = "decode"
+    CATEGORY = CATEGORY
+
+    def decode(
+        self,
+        samples: dict[str, Any],
+        vae: Any,
+        layout: str,
+        gutter_px: int,
+        gutter_color: str,
+    ):
+        if layout not in CHARACTER_SHEET_LAYOUTS:
+            raise ValueError(f"Unknown character-sheet layout: {layout}")
+        if gutter_color not in GUTTER_COLORS:
+            raise ValueError(f"Unknown gutter color: {gutter_color}")
+
+        video, frames, decoded_frames = _decode_h3_frames(samples, vae, "Decode H3 Character Sheet")
+        requested_frames = max(1, int(samples.get("h3edit_requested_frames", decoded_frames)))
+        if layout == CHARACTER_SHEET_AUTO:
+            if requested_frames >= 124:
+                profile = QUALITY_CHARACTER_SIX
+            elif requested_frames >= 73:
+                profile = QUALITY_CHARACTER_FOUR
+            else:
+                raise ValueError(
+                    "Auto character-sheet layout requires a 73- or 124-frame encoded profile; "
+                    f"the latent requests {requested_frames} frame(s)."
+                )
+        else:
+            profile = QUALITY_CHARACTER_FOUR if layout == CHARACTER_SHEET_FOUR else QUALITY_CHARACTER_SIX
+
+        indices = CHARACTER_SHEET_FRAME_INDICES[profile]
+        if decoded_frames <= max(indices):
+            raise ValueError(
+                f"{profile} needs decoded frame index {max(indices)}, but the VAE returned only {decoded_frames} frame(s)."
+            )
+        selected = frames[list(indices)].clone()
+        columns = 2 if profile == QUALITY_CHARACTER_FOUR else 3
+        gutter_value = {"black": 0.0, "neutral gray": 0.5, "white": 1.0}[gutter_color]
+        sheet = _stitch_character_panels(selected, columns, gutter_px, gutter_value)
+        return (
+            sheet,
+            selected,
+            frames,
+            f"Decoded H3 latent {tuple(video.shape)} to {decoded_frames} frame(s); extracted indices "
+            f"{list(indices)} for {profile}; stitched {columns}x{len(indices) // columns} sheet "
+            f"{tuple(sheet.shape)} with {gutter_px}px {gutter_color} gutters.",
+        )
+
+
 NODE_CLASS_MAPPINGS = {
     "AddH3EditReference": AddH3EditReference,
     "TextEncodeH3Edit": TextEncodeH3Edit,
     "DecodeH3SingleFrame": DecodeH3SingleFrame,
+    "DecodeH3CharacterSheet": DecodeH3CharacterSheet,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "AddH3EditReference": "Add H3 Edit Reference",
     "TextEncodeH3Edit": "Text Encode H3 Edit / Generate",
     "DecodeH3SingleFrame": "Decode H3 Edit to One Image",
+    "DecodeH3CharacterSheet": "Decode H3 Character Sheet",
 }

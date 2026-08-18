@@ -1,0 +1,413 @@
+{
+  "last_node_id": 19,
+  "last_link_id": 21,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "title": "REF2VA model",
+      "pos": [-1320, -400],
+      "size": [500, 82],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {"name": "unet_name", "type": "COMBO", "widget": {"name": "unet_name"}, "link": null},
+        {"name": "weight_dtype", "type": "COMBO", "widget": {"name": "weight_dtype"}, "link": null}
+      ],
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [1, 2]}],
+      "properties": {"Node name for S&R": "UNETLoader"},
+      "widgets_values": ["MiniMax-H3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "default"]
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "title": "H3 Qwen3-VL",
+      "pos": [-1320, -270],
+      "size": [500, 106],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {"name": "clip_name", "type": "COMBO", "widget": {"name": "clip_name"}, "link": null},
+        {"name": "type", "type": "COMBO", "widget": {"name": "type"}, "link": null},
+        {"name": "device", "shape": 7, "type": "COMBO", "widget": {"name": "device"}, "link": null}
+      ],
+      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [3]}],
+      "properties": {"Node name for S&R": "CLIPLoader"},
+      "widgets_values": ["MiniMax-H3/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "minimax", "default"]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "title": "H3 video VAE",
+      "pos": [-1320, -120],
+      "size": [500, 60],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [{"name": "vae_name", "type": "COMBO", "widget": {"name": "vae_name"}, "link": null}],
+      "outputs": [{"name": "VAE", "type": "VAE", "links": [4, 5]}],
+      "properties": {"Node name for S&R": "VAELoader"},
+      "widgets_values": ["MiniMax-H3/minimax_h3_video_vae_fp16.safetensors"]
+    },
+    {
+      "id": 4,
+      "type": "LoadImage",
+      "title": "Picture 1 · Primary character / face",
+      "pos": [-1320, 100],
+      "size": [350, 360],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "COMBO", "widget": {"name": "image"}, "link": null},
+        {"name": "upload", "type": "IMAGEUPLOAD", "widget": {"name": "upload"}, "link": null}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [6]},
+        {"name": "MASK", "type": "MASK", "links": null}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["character_primary.png", "image"]
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "title": "Picture 2 · Outfit reference",
+      "pos": [-940, 100],
+      "size": [350, 360],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "COMBO", "widget": {"name": "image"}, "link": null},
+        {"name": "upload", "type": "IMAGEUPLOAD", "widget": {"name": "upload"}, "link": null}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [7]},
+        {"name": "MASK", "type": "MASK", "links": null}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["character_outfit.png", "image"]
+    },
+    {
+      "id": 6,
+      "type": "LoadImage",
+      "title": "Picture 3 · Prop / detail reference",
+      "pos": [-560, 100],
+      "size": [350, 360],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "COMBO", "widget": {"name": "image"}, "link": null},
+        {"name": "upload", "type": "IMAGEUPLOAD", "widget": {"name": "upload"}, "link": null}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [9]},
+        {"name": "MASK", "type": "MASK", "links": null}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["character_prop.png", "image"]
+    },
+    {
+      "id": 7,
+      "type": "AddH3EditReference",
+      "title": "Picture 2 · Native outfit",
+      "pos": [-940, 510],
+      "size": [350, 190],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "IMAGE", "link": 7},
+        {"name": "transport", "type": "COMBO", "widget": {"name": "transport"}, "link": null},
+        {"name": "semantic_resolution", "type": "INT", "widget": {"name": "semantic_resolution"}, "link": null},
+        {"name": "native_reference_size", "type": "COMBO", "widget": {"name": "native_reference_size"}, "link": null},
+        {"name": "previous_references", "shape": 7, "type": "H3EDIT_REFERENCE_STACK", "link": null}
+      ],
+      "outputs": [
+        {"name": "references", "type": "H3EDIT_REFERENCE_STACK", "links": [8]},
+        {"name": "info", "type": "STRING", "links": null}
+      ],
+      "properties": {"Node name for S&R": "AddH3EditReference"},
+      "widgets_values": ["native (Qwen + VAE ref)", 1024, "match output area"]
+    },
+    {
+      "id": 8,
+      "type": "AddH3EditReference",
+      "title": "Picture 3 · Native prop / detail",
+      "pos": [-560, 510],
+      "size": [350, 190],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "IMAGE", "link": 9},
+        {"name": "transport", "type": "COMBO", "widget": {"name": "transport"}, "link": null},
+        {"name": "semantic_resolution", "type": "INT", "widget": {"name": "semantic_resolution"}, "link": null},
+        {"name": "native_reference_size", "type": "COMBO", "widget": {"name": "native_reference_size"}, "link": null},
+        {"name": "previous_references", "shape": 7, "type": "H3EDIT_REFERENCE_STACK", "link": 8}
+      ],
+      "outputs": [
+        {"name": "references", "type": "H3EDIT_REFERENCE_STACK", "links": [10]},
+        {"name": "info", "type": "STRING", "links": null}
+      ],
+      "properties": {"Node name for S&R": "AddH3EditReference"},
+      "widgets_values": ["native (Qwen + VAE ref)", 1024, "match output area"]
+    },
+    {
+      "id": 9,
+      "type": "TextEncodeH3Edit",
+      "title": "Six-panel character-sheet orbit",
+      "pos": [-120, 20],
+      "size": [650, 650],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {"name": "clip", "type": "CLIP", "link": 3},
+        {"name": "vae", "type": "VAE", "link": 4},
+        {"name": "source_image", "type": "IMAGE", "link": 6},
+        {"name": "prompt", "type": "STRING", "widget": {"name": "prompt"}, "link": null},
+        {"name": "primary_image_role", "type": "COMBO", "widget": {"name": "primary_image_role"}, "link": null},
+        {"name": "reference_mode", "type": "COMBO", "widget": {"name": "reference_mode"}, "link": null},
+        {"name": "width", "type": "INT", "widget": {"name": "width"}, "link": null},
+        {"name": "height", "type": "INT", "widget": {"name": "height"}, "link": null},
+        {"name": "source_fit", "type": "COMBO", "widget": {"name": "source_fit"}, "link": null},
+        {"name": "prompt_mode", "type": "COMBO", "widget": {"name": "prompt_mode"}, "link": null},
+        {"name": "semantic_resolution", "type": "INT", "widget": {"name": "semantic_resolution"}, "link": null},
+        {"name": "native_reference_size", "type": "COMBO", "widget": {"name": "native_reference_size"}, "link": null},
+        {"name": "reference_image", "shape": 7, "type": "IMAGE", "link": null},
+        {"name": "quality_profile", "type": "COMBO", "widget": {"name": "quality_profile"}, "link": null},
+        {"name": "reference_stack", "shape": 7, "type": "H3EDIT_REFERENCE_STACK", "link": 10}
+      ],
+      "outputs": [
+        {"name": "positive", "type": "CONDITIONING", "links": [11]},
+        {"name": "latent", "type": "LATENT", "links": [12]},
+        {"name": "fitted_source", "type": "IMAGE", "links": null},
+        {"name": "encoded_prompt", "type": "STRING", "links": null},
+        {"name": "info", "type": "STRING", "links": null}
+      ],
+      "properties": {"Node name for S&R": "TextEncodeH3Edit"},
+      "widgets_values": [
+        "<Picture 1> defines the character's identity, face, hairstyle, body proportions, and overall visual style; ignore its background and pose. <Picture 2> supplies only the complete outfit, including its colors, materials, seams, and accessories; ignore its person, face, hair, pose, and background. <Picture 3> supplies only the requested prop and its construction details; ignore its background and any visible person. Assemble one coherent character with stable anatomy and no duplicated accessories.",
+        "generate | native Picture 1 (REF2VA)",
+        "none (source only)",
+        768,
+        1344,
+        "crop center",
+        "edit instruction",
+        1024,
+        "match output area",
+        "character sheet | 6 panels / 124-frame orbit"
+      ]
+    },
+    {
+      "id": 10,
+      "type": "KSamplerSelect",
+      "pos": [620, -260],
+      "size": [360, 60],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [{"name": "sampler_name", "type": "COMBO", "widget": {"name": "sampler_name"}, "link": null}],
+      "outputs": [{"name": "SAMPLER", "type": "SAMPLER", "links": [13]}],
+      "properties": {"Node name for S&R": "KSamplerSelect"},
+      "widgets_values": ["euler"]
+    },
+    {
+      "id": 11,
+      "type": "BasicScheduler",
+      "pos": [620, -150],
+      "size": [370, 130],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 1},
+        {"name": "scheduler", "type": "COMBO", "widget": {"name": "scheduler"}, "link": null},
+        {"name": "steps", "type": "INT", "widget": {"name": "steps"}, "link": null},
+        {"name": "denoise", "type": "FLOAT", "widget": {"name": "denoise"}, "link": null}
+      ],
+      "outputs": [{"name": "SIGMAS", "type": "SIGMAS", "links": [14]}],
+      "properties": {"Node name for S&R": "BasicScheduler"},
+      "widgets_values": ["linear_quadratic", 25, 1.0]
+    },
+    {
+      "id": 12,
+      "type": "BasicGuider",
+      "pos": [620, 30],
+      "size": [370, 80],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 2},
+        {"name": "conditioning", "type": "CONDITIONING", "link": 11}
+      ],
+      "outputs": [{"name": "GUIDER", "type": "GUIDER", "links": [15]}],
+      "properties": {"Node name for S&R": "BasicGuider"},
+      "widgets_values": []
+    },
+    {
+      "id": 13,
+      "type": "RandomNoise",
+      "pos": [620, 160],
+      "size": [370, 82],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [{"name": "noise_seed", "type": "INT", "widget": {"name": "noise_seed"}, "link": null}],
+      "outputs": [{"name": "NOISE", "type": "NOISE", "links": [16]}],
+      "properties": {"Node name for S&R": "RandomNoise"},
+      "widgets_values": [42, "randomize"]
+    },
+    {
+      "id": 14,
+      "type": "SamplerCustomAdvanced",
+      "pos": [1080, -40],
+      "size": [360, 180],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {"name": "noise", "type": "NOISE", "link": 16},
+        {"name": "guider", "type": "GUIDER", "link": 15},
+        {"name": "sampler", "type": "SAMPLER", "link": 13},
+        {"name": "sigmas", "type": "SIGMAS", "link": 14},
+        {"name": "latent_image", "type": "LATENT", "link": 12}
+      ],
+      "outputs": [
+        {"name": "output", "type": "LATENT", "links": [17]},
+        {"name": "denoised_output", "type": "LATENT", "links": null}
+      ],
+      "properties": {"Node name for S&R": "SamplerCustomAdvanced"},
+      "widgets_values": []
+    },
+    {
+      "id": 15,
+      "type": "DecodeH3CharacterSheet",
+      "title": "Extract six views and stitch 3x2",
+      "pos": [1510, -40],
+      "size": [390, 180],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 17},
+        {"name": "vae", "type": "VAE", "link": 5},
+        {"name": "layout", "type": "COMBO", "widget": {"name": "layout"}, "link": null},
+        {"name": "gutter_px", "type": "INT", "widget": {"name": "gutter_px"}, "link": null},
+        {"name": "gutter_color", "type": "COMBO", "widget": {"name": "gutter_color"}, "link": null}
+      ],
+      "outputs": [
+        {"name": "sheet", "type": "IMAGE", "links": [18, 19]},
+        {"name": "selected_views", "type": "IMAGE", "links": [20]},
+        {"name": "all_frames", "type": "IMAGE", "links": [21]},
+        {"name": "info", "type": "STRING", "links": null}
+      ],
+      "properties": {"Node name for S&R": "DecodeH3CharacterSheet"},
+      "widgets_values": ["auto from encoded profile", 6, "black"]
+    },
+    {
+      "id": 16,
+      "type": "PreviewImage",
+      "title": "Character sheet preview",
+      "pos": [1980, -250],
+      "size": [570, 520],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [{"name": "images", "type": "IMAGE", "link": 18}],
+      "outputs": [],
+      "properties": {"Node name for S&R": "PreviewImage"},
+      "widgets_values": []
+    },
+    {
+      "id": 17,
+      "type": "SaveImage",
+      "title": "Save character sheet",
+      "pos": [1980, 330],
+      "size": [500, 100],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 19},
+        {"name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}, "link": null}
+      ],
+      "outputs": [],
+      "properties": {"Node name for S&R": "SaveImage"},
+      "widgets_values": ["H3CharacterSheet/%date:yyyy-MM-dd%/SHEET"]
+    },
+    {
+      "id": 18,
+      "type": "SaveImage",
+      "title": "Optional · save six selected views",
+      "pos": [1980, 500],
+      "size": [500, 100],
+      "flags": {},
+      "order": 17,
+      "mode": 4,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 20},
+        {"name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}, "link": null}
+      ],
+      "outputs": [],
+      "properties": {"Node name for S&R": "SaveImage"},
+      "widgets_values": ["H3CharacterSheet/%date:yyyy-MM-dd%/views/view"]
+    },
+    {
+      "id": 19,
+      "type": "SaveImage",
+      "title": "Optional · save every orbit frame",
+      "pos": [1980, 650],
+      "size": [500, 100],
+      "flags": {},
+      "order": 18,
+      "mode": 4,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 21},
+        {"name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}, "link": null}
+      ],
+      "outputs": [],
+      "properties": {"Node name for S&R": "SaveImage"},
+      "widgets_values": ["H3CharacterSheet/%date:yyyy-MM-dd%/frames/frame"]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 11, 0, "MODEL"],
+    [2, 1, 0, 12, 0, "MODEL"],
+    [3, 2, 0, 9, 0, "CLIP"],
+    [4, 3, 0, 9, 1, "VAE"],
+    [5, 3, 0, 15, 1, "VAE"],
+    [6, 4, 0, 9, 2, "IMAGE"],
+    [7, 5, 0, 7, 0, "IMAGE"],
+    [8, 7, 0, 8, 4, "H3EDIT_REFERENCE_STACK"],
+    [9, 6, 0, 8, 0, "IMAGE"],
+    [10, 8, 0, 9, 14, "H3EDIT_REFERENCE_STACK"],
+    [11, 9, 0, 12, 1, "CONDITIONING"],
+    [12, 9, 1, 14, 4, "LATENT"],
+    [13, 10, 0, 14, 2, "SAMPLER"],
+    [14, 11, 0, 14, 3, "SIGMAS"],
+    [15, 12, 0, 14, 1, "GUIDER"],
+    [16, 13, 0, 14, 0, "NOISE"],
+    [17, 14, 0, 15, 0, "LATENT"],
+    [18, 15, 0, 16, 0, "IMAGE"],
+    [19, 15, 0, 17, 0, "IMAGE"],
+    [20, 15, 1, 18, 0, "IMAGE"],
+    [21, 15, 2, 19, 0, "IMAGE"]
+  ],
+  "groups": [
+    {"id": 1, "title": "1 · REF2VA, Qwen, and VAE", "bounding": [-1360, -440, 580, 430], "color": "#3f789e", "font_size": 22, "flags": {}},
+    {"id": 2, "title": "2 · Ordered character references", "bounding": [-1360, 60, 1190, 690], "color": "#496b8a", "font_size": 22, "flags": {}},
+    {"id": 3, "title": "3 · Character definition and 124-frame orbit", "bounding": [-160, -20, 730, 740], "color": "#8f6f40", "font_size": 22, "flags": {}},
+    {"id": 4, "title": "4 · Sample and extract calibrated views", "bounding": [580, -310, 1360, 620], "color": "#456744", "font_size": 22, "flags": {}},
+    {"id": 5, "title": "5 · Sheet and optional frame outputs", "bounding": [1940, -290, 650, 1090], "color": "#6f4c7a", "font_size": 22, "flags": {}}
+  ],
+  "config": {},
+  "extra": {"ds": {"scale": 0.67, "offset": [760, 390]}},
+  "version": 0.4
+}

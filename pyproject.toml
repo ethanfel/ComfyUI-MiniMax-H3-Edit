@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-minimax-h3-edit"
-version = "0.5.0"
+version = "0.6.0"
 description = "Minimal single-image MiniMax H3 photo editing with native or semantic references"
 readme = "README.md"
 requires-python = ">=3.10"

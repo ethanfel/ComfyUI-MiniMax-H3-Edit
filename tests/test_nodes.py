@@ -7,11 +7,15 @@ import pytest
 import torch
 
 from h3edit.nodes import (
+    CHARACTER_SHEET_AUTO,
+    CHARACTER_SHEET_SIX,
     NATIVE_SIZE_MATCH,
     PRIMARY_EDIT_ANCHOR,
     PRIMARY_NATIVE_REFERENCE,
     PRIMARY_SEMANTIC_REFERENCE,
     PROMPT_EDIT,
+    QUALITY_CHARACTER_FOUR,
+    QUALITY_CHARACTER_SIX,
     QUALITY_EXPERIMENTAL,
     QUALITY_MAXIMUM,
     QUALITY_RECOMMENDED,
@@ -19,6 +23,7 @@ from h3edit.nodes import (
     REFERENCE_NONE,
     REFERENCE_SEMANTIC,
     AddH3EditReference,
+    DecodeH3CharacterSheet,
     DecodeH3SingleFrame,
     TextEncodeH3Edit,
     semantic_target_size,
@@ -234,6 +239,59 @@ def test_generation_switch_retains_mixed_ordered_reference_transport():
     assert "Mixed semantic/native REF2VA generation is experimental" in info
 
 
+def test_four_panel_character_profile_builds_semantic_fl2va_orbit():
+    clip, vae, (conditioning, latent, _prepared_primary, prompt, info) = _encode(
+        REFERENCE_NONE,
+        quality_profile=QUALITY_CHARACTER_FOUR,
+        primary_image_role=PRIMARY_SEMANTIC_REFERENCE,
+    )
+
+    video, audio = latent["samples"].unbind()
+    assert video.shape == (1, 24, 22, 84, 48)
+    assert audio.shape == (1, 32, 2, 122)
+    assert latent["h3edit_requested_frames"] == 73
+    assert latent["h3edit_natural_frames"] == 73
+    assert len(vae.encoded) == 0
+    assert "minimax_keyframes" not in conditioning[0][1]
+    assert "subject_definitions:" in prompt
+    assert "summary:\n[reference generation]" in prompt
+    assert "retention_analysis:" in prompt
+    assert "detailed_description:" in prompt
+    assert "180-degree orbit" in prompt
+    assert "overall_soundscape:" in prompt
+    assert "non_diegetic_music:" in prompt
+    assert "Decode H3 Character Sheet" in info
+    assert len(clip.tokenize_calls[0][1]["minimax_ref_items"]) == 1
+
+
+def test_six_panel_character_profile_builds_native_ref2va_orbit():
+    _clip, vae, (conditioning, latent, _prepared_primary, prompt, info) = _encode(
+        REFERENCE_NONE,
+        quality_profile=QUALITY_CHARACTER_SIX,
+        primary_image_role=PRIMARY_NATIVE_REFERENCE,
+    )
+
+    video, audio = latent["samples"].unbind()
+    assert video.shape == (1, 24, 37, 84, 48)
+    assert audio.shape == (1, 32, 2, 207)
+    assert latent["h3edit_requested_frames"] == 124
+    assert latent["h3edit_natural_frames"] == 124
+    assert len(vae.encoded) == 1
+    assert "minimax_keyframes" not in conditioning[0][1]
+    assert len(conditioning[0][1]["minimax_refs"]) == 1
+    assert "360-degree orbit" in prompt
+    assert "expected route REF2VA" in info
+
+
+def test_character_profile_rejects_strong_source_anchor():
+    with pytest.raises(ValueError, match="cannot be a frame anchor"):
+        _encode(
+            REFERENCE_NONE,
+            quality_profile=QUALITY_CHARACTER_FOUR,
+            primary_image_role=PRIMARY_EDIT_ANCHOR,
+        )
+
+
 def test_none_mode_can_leave_reference_socket_connected():
     clip, vae, (conditioning, _latent, _fitted, _prompt, info) = _encode(
         REFERENCE_NONE,
@@ -372,3 +430,54 @@ def test_packet_decode_scores_context_and_returns_one_frame():
     assert "to 5 frame(s)" in info
     assert "scored 5 requested candidate(s)" in info
     assert f"stable-quality frame {selected_value}" in info
+
+
+def test_character_sheet_decoder_extracts_and_stitches_four_calibrated_views():
+    vae = FakeVAE()
+    video = torch.zeros((1, 24, 22, 4, 3))
+    audio = torch.zeros((1, 32, 2, 122))
+    samples = {
+        "samples": FakeNestedTensor((video, audio)),
+        "h3edit_requested_frames": 73,
+        "h3edit_natural_frames": 73,
+    }
+
+    sheet, selected, all_frames, info = DecodeH3CharacterSheet().decode(
+        samples,
+        vae,
+        CHARACTER_SHEET_AUTO,
+        6,
+        "black",
+    )
+
+    assert sheet.shape == (1, 134, 102, 3)
+    assert selected.shape == (4, 64, 48, 3)
+    assert all_frames.shape == (73, 64, 48, 3)
+    assert selected[:, 0, 0, 0].tolist() == [2.0, 24.0, 45.0, 68.0]
+    assert "[2, 24, 45, 68]" in info
+    assert "2x2 sheet" in info
+
+
+def test_character_sheet_decoder_can_force_six_panel_layout():
+    vae = FakeVAE()
+    video = torch.zeros((1, 24, 37, 4, 3))
+    audio = torch.zeros((1, 32, 2, 207))
+    samples = {
+        "samples": FakeNestedTensor((video, audio)),
+        "h3edit_requested_frames": 124,
+        "h3edit_natural_frames": 124,
+    }
+
+    sheet, selected, all_frames, info = DecodeH3CharacterSheet().decode(
+        samples,
+        vae,
+        CHARACTER_SHEET_SIX,
+        6,
+        "neutral gray",
+    )
+
+    assert sheet.shape == (1, 134, 156, 3)
+    assert selected.shape == (6, 64, 48, 3)
+    assert all_frames.shape == (124, 64, 48, 3)
+    assert selected[:, 0, 0, 0].tolist() == [2.0, 21.0, 42.0, 63.0, 84.0, 113.0]
+    assert "3x2 sheet" in info
