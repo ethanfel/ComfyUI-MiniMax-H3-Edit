@@ -157,9 +157,9 @@
     {
       "id": 6,
       "type": "TextEncodeH3Edit",
-      "title": "Mixed semantic + native edit",
+      "title": "Switchable edit / reference generation",
       "pos": [-120, 20],
-      "size": [620, 560],
+      "size": [620, 590],
       "flags": {},
       "order": 8,
       "mode": 0,
@@ -168,6 +168,7 @@
         {"name": "vae", "type": "VAE", "link": 3},
         {"name": "source_image", "type": "IMAGE", "link": 5},
         {"name": "prompt", "type": "STRING", "widget": {"name": "prompt"}, "link": null},
+        {"name": "primary_image_role", "type": "COMBO", "widget": {"name": "primary_image_role"}, "link": null},
         {"name": "reference_mode", "type": "COMBO", "widget": {"name": "reference_mode"}, "link": null},
         {"name": "width", "type": "INT", "widget": {"name": "width"}, "link": null},
         {"name": "height", "type": "INT", "widget": {"name": "height"}, "link": null},
@@ -189,6 +190,7 @@
       "properties": {"Node name for S&R": "TextEncodeH3Edit"},
       "widgets_values": [
         "Add the black acetate glasses from <Picture 2> to the woman, fitting them naturally with realistic temples, reflections, and contact shadows. Replace only her jacket with the jacket from <Picture 3>, preserving its exact color, material, seams, and texture. Preserve her identity, pose, expression, body, background, lighting, and framing.",
+        "edit | strong scene anchor (FL2VA)",
         "none (source only)",
         768,
         1344,
@@ -367,7 +369,7 @@
     [17, 13, 0, 15, 0, "IMAGE"],
     [18, 16, 0, 18, 4, "H3EDIT_REFERENCE_STACK"],
     [19, 17, 0, 18, 0, "IMAGE"],
-    [20, 18, 0, 6, 13, "H3EDIT_REFERENCE_STACK"]
+    [20, 18, 0, 6, 14, "H3EDIT_REFERENCE_STACK"]
   ],
   "groups": [
     {"id": 1, "title": "1 · Source + mixed semantic/native reference stack", "bounding": [-1360, 60, 1190, 690], "color": "#3f789e", "font_size": 22, "flags": {}},

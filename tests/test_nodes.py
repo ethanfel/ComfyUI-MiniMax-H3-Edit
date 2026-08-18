@@ -8,6 +8,9 @@ import torch
 
 from h3edit.nodes import (
     NATIVE_SIZE_MATCH,
+    PRIMARY_EDIT_ANCHOR,
+    PRIMARY_NATIVE_REFERENCE,
+    PRIMARY_SEMANTIC_REFERENCE,
     PROMPT_EDIT,
     QUALITY_EXPERIMENTAL,
     QUALITY_MAXIMUM,
@@ -93,6 +96,7 @@ def _encode(
     semantic_resolution=1024,
     quality_profile=QUALITY_RECOMMENDED,
     reference_stack=None,
+    primary_image_role=PRIMARY_EDIT_ANCHOR,
 ):
     clip = FakeClip()
     vae = FakeVAE()
@@ -108,6 +112,7 @@ def _encode(
         prompt_mode=PROMPT_EDIT,
         semantic_resolution=semantic_resolution,
         native_reference_size=NATIVE_SIZE_MATCH,
+        primary_image_role=primary_image_role,
         reference_image=reference_image,
         quality_profile=quality_profile,
         reference_stack=reference_stack,
@@ -170,6 +175,63 @@ def test_native_reference_gets_qwen_and_vae_transport():
     assert ref["latent_h"] == vae.encoded[1].shape[1] // 16
     assert ref["latent_w"] == vae.encoded[1].shape[2] // 16
     assert "mixed with the frame-zero keyframe are experimental" in info
+
+
+def test_semantic_generation_switch_removes_every_vae_anchor():
+    clip, vae, (conditioning, _latent, prepared_primary, prompt, info) = _encode(
+        REFERENCE_NONE,
+        primary_image_role=PRIMARY_SEMANTIC_REFERENCE,
+    )
+
+    assert len(vae.encoded) == 0
+    assert len(clip.tokenize_calls[0][1]["minimax_ref_items"]) == 1
+    expected_width, expected_height = semantic_target_size(_image(), 1024)
+    assert prepared_primary.shape == (1, expected_height, expected_width, 3)
+    metadata = conditioning[0][1]
+    assert "minimax_keyframes" not in metadata
+    assert "minimax_refs" not in metadata
+    assert "Create a completely new still image" in prompt
+    assert "<Picture 1> is a semantic Qwen-only reference" in prompt
+    assert "no frame-zero keyframe" in info
+    assert "expected route FL2VA" in info
+
+
+def test_native_generation_switch_uses_ref2va_without_a_keyframe():
+    clip, vae, (conditioning, _latent, _prepared_primary, prompt, info) = _encode(
+        REFERENCE_NONE,
+        primary_image_role=PRIMARY_NATIVE_REFERENCE,
+    )
+
+    assert len(vae.encoded) == 1
+    assert len(clip.tokenize_calls[0][1]["minimax_ref_items"]) == 1
+    metadata = conditioning[0][1]
+    assert "minimax_keyframes" not in metadata
+    assert len(metadata["minimax_refs"]) == 1
+    assert "<Picture 1> is a native Qwen+VAE reference" in prompt
+    assert "no frame-zero keyframe" in info
+    assert "expected route REF2VA" in info
+
+
+def test_generation_switch_retains_mixed_ordered_reference_transport():
+    native_stack, _info = AddH3EditReference().add(
+        image=_image(height=900, width=600),
+        transport=REFERENCE_NATIVE,
+        semantic_resolution=1024,
+        native_reference_size=NATIVE_SIZE_MATCH,
+    )
+    clip, vae, (conditioning, _latent, _prepared_primary, prompt, info) = _encode(
+        REFERENCE_NONE,
+        reference_stack=native_stack,
+        primary_image_role=PRIMARY_SEMANTIC_REFERENCE,
+    )
+
+    assert len(clip.tokenize_calls[0][1]["minimax_ref_items"]) == 2
+    assert len(vae.encoded) == 1
+    assert "<Picture 1> is a semantic Qwen-only reference" in prompt
+    assert "<Picture 2> is a native Qwen+VAE reference" in prompt
+    assert "minimax_keyframes" not in conditioning[0][1]
+    assert len(conditioning[0][1]["minimax_refs"]) == 1
+    assert "Mixed semantic/native REF2VA generation is experimental" in info
 
 
 def test_none_mode_can_leave_reference_socket_connected():

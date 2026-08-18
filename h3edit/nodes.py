@@ -38,6 +38,11 @@ REFERENCE_MODES = [REFERENCE_SEMANTIC, REFERENCE_NATIVE, REFERENCE_NONE]
 REFERENCE_TRANSPORTS = [REFERENCE_SEMANTIC, REFERENCE_NATIVE]
 REFERENCE_STACK_TYPE = "H3EDIT_REFERENCE_STACK"
 
+PRIMARY_EDIT_ANCHOR = "edit | strong scene anchor (FL2VA)"
+PRIMARY_SEMANTIC_REFERENCE = "generate | semantic Picture 1 (FL2VA)"
+PRIMARY_NATIVE_REFERENCE = "generate | native Picture 1 (REF2VA)"
+PRIMARY_IMAGE_ROLES = [PRIMARY_EDIT_ANCHOR, PRIMARY_SEMANTIC_REFERENCE, PRIMARY_NATIVE_REFERENCE]
+
 PROMPT_EDIT = "edit instruction"
 PROMPT_VERBATIM = "use prompt verbatim"
 PROMPT_MODES = [PROMPT_EDIT, PROMPT_VERBATIM]
@@ -178,36 +183,80 @@ def _native_reference_size(
     return _fit_grid_area(source_width, source_height, target_area)
 
 
-def _build_prompt(prompt: str, prompt_mode: str, reference_modes: list[str], frame_count: int) -> str:
+def _guide_contract(ordinal: int, reference_mode: str, *, generation: bool) -> str:
+    if reference_mode == REFERENCE_SEMANTIC:
+        if generation:
+            return (
+                f" <Picture {ordinal}> is a semantic Qwen-only reference. Use its identity, concept, object, style, "
+                "material, or composition only as requested; it is not a fixed source frame."
+            )
+        return (
+            f" <Picture {ordinal}> is a semantic visual guide only. Transfer only the requested concept, object, "
+            "material, or attribute from it; do not copy its scene, identity, pose, or composition."
+        )
+    if reference_mode == REFERENCE_NATIVE:
+        if generation:
+            return (
+                f" <Picture {ordinal}> is a native Qwen+VAE reference. Use its detailed visual appearance for only "
+                "the role requested; it is not a frame or composition anchor."
+            )
+        return (
+            f" <Picture {ordinal}> is a native visual reference. Use its detailed appearance only where the "
+            "requested edit calls for it."
+        )
+    return ""
+
+
+def _build_prompt(
+    prompt: str,
+    prompt_mode: str,
+    reference_modes: list[str],
+    frame_count: int,
+    primary_image_role: str,
+) -> str:
     prompt = (prompt or "").strip()
     if prompt_mode == PROMPT_VERBATIM:
         return prompt
-    guide_parts = []
-    for ordinal, reference_mode in enumerate(reference_modes, start=2):
-        if reference_mode == REFERENCE_SEMANTIC:
-            guide_parts.append(
-                f" <Picture {ordinal}> is a semantic visual guide only. Transfer only the requested concept, object, "
-                "material, or attribute from it; do not copy its scene, identity, pose, or composition."
+
+    if primary_image_role == PRIMARY_EDIT_ANCHOR:
+        guide = "".join(
+            _guide_contract(ordinal, reference_mode, generation=False)
+            for ordinal, reference_mode in enumerate(reference_modes, start=2)
+        )
+        still_contract = (
+            " Produce exactly one finished still image."
+            if frame_count == 1
+            else (
+                " Apply the edit immediately after the source anchor, then hold the fully completed result unchanged "
+                "across the short internal frame packet: locked camera, fixed composition, no subject motion, and no "
+                "temporal progression. Every generated frame must read as a crisp finished still image."
             )
-        elif reference_mode == REFERENCE_NATIVE:
-            guide_parts.append(
-                f" <Picture {ordinal}> is a native visual reference. Use its detailed appearance only where the "
-                "requested edit calls for it."
-            )
-    guide = "".join(guide_parts)
+        )
+        return (
+            "Edit <Picture 1>, which is the source image and frame-zero anchor. Preserve the source identity, facial "
+            "structure, pose, framing, lighting, background, and all unrequested details."
+            f"{guide}{still_contract} Requested edit: {prompt}"
+        )
+
+    primary_transport = (
+        REFERENCE_SEMANTIC if primary_image_role == PRIMARY_SEMANTIC_REFERENCE else REFERENCE_NATIVE
+    )
+    guide = "".join(
+        _guide_contract(ordinal, reference_mode, generation=True)
+        for ordinal, reference_mode in enumerate([primary_transport, *reference_modes], start=1)
+    )
     still_contract = (
         " Produce exactly one finished still image."
         if frame_count == 1
         else (
-            " Apply the edit immediately after the source anchor, then hold the fully completed result unchanged "
-            "across the short internal frame packet: locked camera, fixed composition, no subject motion, and no "
-            "temporal progression. Every generated frame must read as a crisp finished still image."
+            " Generate the finished image immediately, then hold it unchanged across the short internal frame packet: "
+            "locked camera, fixed composition, no subject motion, and no temporal progression. Every generated frame "
+            "must read as the same crisp finished still image."
         )
     )
     return (
-        "Edit <Picture 1>, which is the source image and frame-zero anchor. Preserve the source identity, facial "
-        "structure, pose, framing, lighting, background, and all unrequested details."
-        f"{guide}{still_contract} Requested edit: {prompt}"
+        "Create a completely new still image from the requested elements. No input picture is a source frame or scene "
+        f"anchor.{guide}{still_contract} Requested image: {prompt}"
     )
 
 
@@ -410,12 +459,12 @@ class AddH3EditReference:
 
 
 class TextEncodeH3Edit:
-    """Prepare a native source edit plus an optional native or semantic guide."""
+    """Prepare a source-anchored edit or reference-driven still generation."""
 
     DESCRIPTION = (
-        "One-node MiniMax H3 single-image edit conditioning. Picture 1 is always the VAE keyframe source. "
-        "The direct Picture 2 guide and an unlimited ordered reference stack can independently use Qwen-only semantic "
-        "or native Qwen+VAE transport. Quality modes use a short hidden temporal packet but emit one final image."
+        "Switch Picture 1 between a strong FL2VA source anchor, a semantic FL2VA generation reference, or a native "
+        "REF2VA generation reference. Additional ordered guides independently use Qwen-only semantic or native "
+        "Qwen+VAE transport. Quality modes use a short hidden temporal packet but emit one final image."
     )
 
     @classmethod
@@ -423,10 +472,15 @@ class TextEncodeH3Edit:
         return {
             "required": {
                 "clip": ("CLIP", {"tooltip": "MiniMax H3 Qwen3-VL text/vision encoder."}),
-                "vae": ("VAE", {"tooltip": "MiniMax H3 video VAE used for the source anchor."}),
+                "vae": ("VAE", {"tooltip": "MiniMax H3 video VAE used by anchor and native-reference modes."}),
                 "source_image": (
                     "IMAGE",
-                    {"tooltip": "Picture 1: the photo to edit. It is always encoded as the frame-zero native anchor."},
+                    {
+                        "tooltip": (
+                            "Picture 1: the photo to edit in anchor mode, or the first semantic/native reference in "
+                            "generation mode."
+                        )
+                    },
                 ),
                 "prompt": (
                     "STRING",
@@ -434,7 +488,17 @@ class TextEncodeH3Edit:
                         "multiline": True,
                         "dynamicPrompts": True,
                         "default": "Add the glasses from <Picture 2> to the woman.",
-                        "tooltip": "The requested edit. Picture tags are optional in edit-instruction mode.",
+                        "tooltip": "The requested edit or new image. Use explicit <Picture N> roles for references.",
+                    },
+                ),
+                "primary_image_role": (
+                    PRIMARY_IMAGE_ROLES,
+                    {
+                        "default": PRIMARY_EDIT_ANCHOR,
+                        "tooltip": (
+                            "Edit creates a frame-zero VAE keyframe. Generate removes that keyframe and treats "
+                            "Picture 1 as either a semantic FL2VA or native REF2VA reference."
+                        ),
                     },
                 ),
                 "reference_mode": (
@@ -477,8 +541,8 @@ class TextEncodeH3Edit:
                         "max": MAX_SEMANTIC_RESOLUTION,
                         "step": 32,
                         "tooltip": (
-                            "Equivalent-square Qwen pixel budget for a semantic Picture 2. Aspect ratio is preserved. "
-                            "It does not allocate a VAE latent."
+                            "Equivalent-square Qwen pixel budget for semantic direct or Picture 1 generation refs. "
+                            "Aspect ratio is preserved and no VAE latent is allocated."
                         ),
                     },
                 ),
@@ -486,14 +550,14 @@ class TextEncodeH3Edit:
                     NATIVE_SIZE_MODES,
                     {
                         "default": NATIVE_SIZE_MATCH,
-                        "tooltip": "Resize policy used only for native Picture 2 VAE conditioning.",
+                        "tooltip": "Resize policy for native direct or Picture 1 generation-reference VAE conditioning.",
                     },
                 ),
             },
             "optional": {
                 "reference_image": (
                     "IMAGE",
-                    {"tooltip": "Optional Picture 2 guide. Choose semantic or native transport above."},
+                    {"tooltip": "Optional next Picture guide. Choose semantic or native transport above."},
                 ),
                 "quality_profile": (
                     list(QUALITY_PROFILES),
@@ -520,9 +584,9 @@ class TextEncodeH3Edit:
     RETURN_TYPES = ("CONDITIONING", "LATENT", "IMAGE", "STRING", "STRING")
     RETURN_NAMES = ("positive", "latent", "fitted_source", "encoded_prompt", "info")
     OUTPUT_TOOLTIPS = (
-        "Positive conditioning with the native source keyframe and every ordered guide transport.",
+        "Positive conditioning with the selected Picture 1 role and every ordered guide transport.",
         "An H3 latent with the selected hidden quality context; downstream decode still emits one image.",
-        "Picture 1 after fitting to the output canvas.",
+        "Picture 1 after preparation for its selected anchor/reference role.",
         "The exact prompt sent after the visual token blocks.",
         "Reference transport, Qwen size, VAE usage, and checkpoint guidance.",
     )
@@ -542,6 +606,7 @@ class TextEncodeH3Edit:
         prompt_mode: str,
         semantic_resolution: int,
         native_reference_size: str,
+        primary_image_role: str = PRIMARY_EDIT_ANCHOR,
         reference_image: torch.Tensor | None = None,
         quality_profile: str = QUALITY_RECOMMENDED,
         reference_stack: tuple[dict[str, Any], ...] | None = None,
@@ -550,6 +615,8 @@ class TextEncodeH3Edit:
 
         if reference_mode not in REFERENCE_MODES:
             raise ValueError(f"Unknown reference_mode: {reference_mode}")
+        if primary_image_role not in PRIMARY_IMAGE_ROLES:
+            raise ValueError(f"Unknown primary_image_role: {primary_image_role}")
         if source_fit not in SOURCE_FIT_MODES:
             raise ValueError(f"Unknown source_fit: {source_fit}")
         if prompt_mode not in PROMPT_MODES:
@@ -559,12 +626,34 @@ class TextEncodeH3Edit:
 
         width = _round_dimension(width)
         height = _round_dimension(height)
-        fitted_source = _resize(source_image, width, height, source_fit)
-        source_latent = vae.encode(fitted_source)
-
-        visual_items = [{"type": "image", "data": fitted_source}]
+        primary_image = _validate_image(source_image, "source_image")
+        anchored_edit = primary_image_role == PRIMARY_EDIT_ANCHOR
+        source_latent = None
+        visual_items: list[dict[str, Any]] = []
         ref_blocks: list[dict[str, Any]] = []
         reference_specs: list[dict[str, Any]] = []
+        if anchored_edit:
+            fitted_source = _resize(primary_image, width, height, source_fit)
+            source_latent = vae.encode(fitted_source)
+            visual_items.append({"type": "image", "data": fitted_source})
+            first_reference_ordinal = 2
+        else:
+            primary_transport = (
+                REFERENCE_SEMANTIC
+                if primary_image_role == PRIMARY_SEMANTIC_REFERENCE
+                else REFERENCE_NATIVE
+            )
+            reference_specs.append(
+                {
+                    "image": primary_image,
+                    "transport": primary_transport,
+                    "semantic_resolution": int(semantic_resolution),
+                    "native_reference_size": native_reference_size,
+                }
+            )
+            fitted_source = primary_image
+            first_reference_ordinal = 1
+
         ignored_direct = reference_mode == REFERENCE_NONE and reference_image is not None
         if reference_image is not None and reference_mode != REFERENCE_NONE:
             reference_specs.append(
@@ -600,12 +689,14 @@ class TextEncodeH3Edit:
         reference_notes = []
         semantic_count = 0
         native_count = 0
-        for ordinal, item in enumerate(reference_specs, start=2):
+        for ordinal, item in enumerate(reference_specs, start=first_reference_ordinal):
             reference = item["image"]
             if item["transport"] == REFERENCE_SEMANTIC:
                 semantic_width, semantic_height = semantic_target_size(reference, item["semantic_resolution"])
                 prepared_reference = _resize_exact(reference, semantic_width, semantic_height)
                 visual_items.append({"type": "image", "data": prepared_reference})
+                if not anchored_edit and ordinal == 1:
+                    fitted_source = prepared_reference
                 semantic_count += 1
                 reference_notes.append(
                     f"Picture {ordinal} semantic Qwen-only {semantic_width}x{semantic_height} (VAE skipped)"
@@ -620,6 +711,8 @@ class TextEncodeH3Edit:
                 prepared_reference = _resize_exact(reference, native_width, native_height)
                 reference_latent = vae.encode(prepared_reference)
                 visual_items.append({"type": "image", "data": prepared_reference})
+                if not anchored_edit and ordinal == 1:
+                    fitted_source = prepared_reference
                 ref_blocks.append(
                     {
                         "kind": "image",
@@ -631,43 +724,57 @@ class TextEncodeH3Edit:
                 native_count += 1
                 reference_notes.append(f"Picture {ordinal} native Qwen+VAE {native_width}x{native_height}")
 
-        if reference_notes:
+        if anchored_edit and not reference_notes:
+            reference_note = "No guide references; only Picture 1 is presented to Qwen."
+        else:
+            reference_kind = "guide" if anchored_edit else "generation reference"
+            checkpoint = "FL2VA edit" if anchored_edit else "REF2VA" if native_count else "FL2VA"
             reference_note = (
-                f"{len(reference_specs)} ordered guide(s): " + "; ".join(reference_notes) + ". "
-                f"Semantic={semantic_count}; native={native_count}. Use an FL2VA edit checkpoint."
+                f"{len(reference_specs)} ordered {reference_kind}(s): " + "; ".join(reference_notes) + ". "
+                f"Semantic={semantic_count}; native={native_count}. Use a {checkpoint} checkpoint."
             )
-            if native_count:
+            if anchored_edit and native_count:
                 reference_note += (
                     " Native guide minimax_refs mixed with the frame-zero keyframe are experimental and require "
                     "weights that respond to both transports."
                 )
-        else:
-            reference_note = "No guide references; only Picture 1 is presented to Qwen."
+            elif not anchored_edit and semantic_count and native_count:
+                reference_note += (
+                    " Mixed semantic/native REF2VA generation is experimental because Qwen picture order includes "
+                    "semantic entries that have no matching VAE reference block."
+                )
 
         requested_frames = QUALITY_PROFILES[quality_profile]
         latent, natural_frames = _empty_h3_edit_latent(width, height, requested_frames)
+        additional_modes = [item["transport"] for item in reference_specs]
+        if not anchored_edit:
+            additional_modes = additional_modes[1:]
         encoded_prompt = _build_prompt(
             prompt,
             prompt_mode,
-            [item["transport"] for item in reference_specs],
+            additional_modes,
             requested_frames,
+            primary_image_role,
         )
         tokens = clip.tokenize(encoded_prompt, minimax_ref_items=visual_items)
         conditioning = clip.encode_from_tokens_scheduled(tokens)
-        conditioning_values: dict[str, Any] = {
-            "minimax_keyframes": [{"resolved_frame_index": 0, "latent": source_latent}],
-            "minimax_frame_count": natural_frames,
-        }
+        conditioning_values: dict[str, Any] = {"minimax_frame_count": natural_frames}
+        if anchored_edit:
+            conditioning_values["minimax_keyframes"] = [{"resolved_frame_index": 0, "latent": source_latent}]
         if ref_blocks:
             conditioning_values["minimax_refs"] = ref_blocks
         conditioning = node_helpers.conditioning_set_values(conditioning, conditioning_values)
 
         ignored_note = " The direct reference_image is intentionally ignored." if ignored_direct else ""
+        if anchored_edit:
+            mode_note = f"Strong-anchor edit | Picture 1 native frame-zero keyframe ({tuple(source_latent.shape)})"
+        else:
+            route = "REF2VA" if native_count else "FL2VA"
+            mode_note = f"Reference-driven generation | no frame-zero keyframe | expected route {route}"
         info = (
-            f"Single-image H3 edit | {quality_profile} | requested context {requested_frames} frames | "
+            f"{mode_note} | {quality_profile} | requested context {requested_frames} frames | "
             f"natural packet {natural_frames} frames | "
-            f"output {width}x{height} | Picture 1 native frame-zero keyframe "
-            f"({tuple(source_latent.shape)}) | {reference_note}{ignored_note} "
+            f"output {width}x{height} | {reference_note}{ignored_note} "
             "Decode H3 Edit to One Image scores the decoded context and returns one stable high-quality still."
         )
         return conditioning, latent, fitted_source, encoded_prompt, info
@@ -740,6 +847,6 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "AddH3EditReference": "Add H3 Edit Reference",
-    "TextEncodeH3Edit": "Text Encode H3 Edit",
+    "TextEncodeH3Edit": "Text Encode H3 Edit / Generate",
     "DecodeH3SingleFrame": "Decode H3 Edit to One Image",
 }
