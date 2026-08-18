@@ -5,7 +5,7 @@ A deliberately small ComfyUI node pack for **single-image MiniMax H3 photo editi
 The pack adds three nodes:
 
 - **Add H3 Edit Reference** — builds an ordered, chainable reference stack; every image independently chooses semantic or native transport.
-- **Text Encode H3 Edit** — turns a source image, edit instruction, and optional guide into H3 conditioning plus a short, valid H3 temporal packet.
+- **Text Encode H3 Edit** — turns a source image, edit instruction, and optional ordered guides into H3 conditioning plus a short, valid H3 temporal packet.
 - **Decode H3 Edit to One Image** — decodes the packet, scores its candidates, and returns one stable high-quality frame.
 
 The graph still produces exactly one image. By default, it samples the same short 5-frame context used by H3 Studio because H3 is a video model and a literal one-token latent leaves no temporal context around the edit. The old true-one-frame path remains available as an explicitly experimental, low-quality option.
@@ -83,7 +83,7 @@ Restart ComfyUI. The nodes appear under `MiniMax H3/Edit`.
 5. Use `ModelSamplingMiniMaxH3`, `BasicGuider`, `RandomNoise`, a sampler and scheduler, and `SamplerCustomAdvanced` as in the normal native H3 graph.
 6. Connect the sampled latent to **Decode H3 Edit to One Image**, then preview or save its image output.
 
-The example workflow is configured for a single-image FL2VA edit using the recommended hidden 5-frame context. Replace its model filenames and input images with files available in your ComfyUI installation.
+The included [mixed-reference example workflow](example_workflows/H3_Edit_Mixed_References.json) is configured for a single-image FL2VA edit using the recommended hidden 5-frame context. It uses semantic glasses as `<Picture 2>` and a native wardrobe/material guide as `<Picture 3>` in the same generation. Replace its model filenames and input images with files available in your ComfyUI installation.
 
 ## Prompt behavior
 

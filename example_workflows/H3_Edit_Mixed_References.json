@@ -1,6 +1,6 @@
 {
-  "last_node_id": 15,
-  "last_link_id": 17,
+  "last_node_id": 18,
+  "last_link_id": 20,
   "nodes": [
     {
       "id": 1,
@@ -52,7 +52,7 @@
       "id": 4,
       "type": "LoadImage",
       "title": "Picture 1 · Photo to edit",
-      "pos": [-920, 100],
+      "pos": [-1320, 100],
       "size": [350, 360],
       "flags": {},
       "order": 3,
@@ -72,7 +72,7 @@
       "id": 5,
       "type": "LoadImage",
       "title": "Picture 2 · Glasses semantic guide",
-      "pos": [-920, 510],
+      "pos": [-940, 100],
       "size": [350, 360],
       "flags": {},
       "order": 4,
@@ -89,12 +89,79 @@
       "widgets_values": ["semantic_guide.png", "image"]
     },
     {
-      "id": 6,
-      "type": "TextEncodeH3Edit",
-      "pos": [-390, 20],
-      "size": [620, 560],
+      "id": 17,
+      "type": "LoadImage",
+      "title": "Picture 3 · Native wardrobe/material guide",
+      "pos": [-560, 100],
+      "size": [350, 360],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "COMBO", "widget": {"name": "image"}, "link": null},
+        {"name": "upload", "type": "IMAGEUPLOAD", "widget": {"name": "upload"}, "link": null}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [19]},
+        {"name": "MASK", "type": "MASK", "links": null}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["native_wardrobe_guide.png", "image"]
+    },
+    {
+      "id": 16,
+      "type": "AddH3EditReference",
+      "title": "Picture 2 · Semantic (Qwen only)",
+      "pos": [-940, 510],
+      "size": [350, 190],
       "flags": {},
       "order": 6,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "IMAGE", "link": 6},
+        {"name": "transport", "type": "COMBO", "widget": {"name": "transport"}, "link": null},
+        {"name": "semantic_resolution", "type": "INT", "widget": {"name": "semantic_resolution"}, "link": null},
+        {"name": "native_reference_size", "type": "COMBO", "widget": {"name": "native_reference_size"}, "link": null},
+        {"name": "previous_references", "shape": 7, "type": "H3EDIT_REFERENCE_STACK", "link": null}
+      ],
+      "outputs": [
+        {"name": "references", "type": "H3EDIT_REFERENCE_STACK", "links": [18]},
+        {"name": "info", "type": "STRING", "links": null}
+      ],
+      "properties": {"Node name for S&R": "AddH3EditReference"},
+      "widgets_values": ["semantic (Qwen only)", 1024, "match output area"]
+    },
+    {
+      "id": 18,
+      "type": "AddH3EditReference",
+      "title": "Picture 3 · Native (Qwen + VAE)",
+      "pos": [-560, 510],
+      "size": [350, 190],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "IMAGE", "link": 19},
+        {"name": "transport", "type": "COMBO", "widget": {"name": "transport"}, "link": null},
+        {"name": "semantic_resolution", "type": "INT", "widget": {"name": "semantic_resolution"}, "link": null},
+        {"name": "native_reference_size", "type": "COMBO", "widget": {"name": "native_reference_size"}, "link": null},
+        {"name": "previous_references", "shape": 7, "type": "H3EDIT_REFERENCE_STACK", "link": 18}
+      ],
+      "outputs": [
+        {"name": "references", "type": "H3EDIT_REFERENCE_STACK", "links": [20]},
+        {"name": "info", "type": "STRING", "links": null}
+      ],
+      "properties": {"Node name for S&R": "AddH3EditReference"},
+      "widgets_values": ["native (Qwen + VAE ref)", 1024, "match output area"]
+    },
+    {
+      "id": 6,
+      "type": "TextEncodeH3Edit",
+      "title": "Mixed semantic + native edit",
+      "pos": [-120, 20],
+      "size": [620, 560],
+      "flags": {},
+      "order": 8,
       "mode": 0,
       "inputs": [
         {"name": "clip", "type": "CLIP", "link": 2},
@@ -108,9 +175,9 @@
         {"name": "prompt_mode", "type": "COMBO", "widget": {"name": "prompt_mode"}, "link": null},
         {"name": "semantic_resolution", "type": "INT", "widget": {"name": "semantic_resolution"}, "link": null},
         {"name": "native_reference_size", "type": "COMBO", "widget": {"name": "native_reference_size"}, "link": null},
-        {"name": "reference_image", "shape": 7, "type": "IMAGE", "link": 6},
+        {"name": "reference_image", "shape": 7, "type": "IMAGE", "link": null},
         {"name": "quality_profile", "type": "COMBO", "widget": {"name": "quality_profile"}, "link": null},
-        {"name": "reference_stack", "shape": 7, "type": "H3EDIT_REFERENCE_STACK", "link": null}
+        {"name": "reference_stack", "shape": 7, "type": "H3EDIT_REFERENCE_STACK", "link": 20}
       ],
       "outputs": [
         {"name": "positive", "type": "CONDITIONING", "links": [7]},
@@ -121,8 +188,8 @@
       ],
       "properties": {"Node name for S&R": "TextEncodeH3Edit"},
       "widgets_values": [
-        "Add the black acetate glasses from <Picture 2> to the woman. Fit them naturally to her face with realistic temples, reflections, and contact shadows. Change nothing else.",
-        "semantic (Qwen only)",
+        "Add the black acetate glasses from <Picture 2> to the woman, fitting them naturally with realistic temples, reflections, and contact shadows. Replace only her jacket with the jacket from <Picture 3>, preserving its exact color, material, seams, and texture. Preserve her identity, pose, expression, body, background, lighting, and framing.",
+        "none (source only)",
         768,
         1344,
         "crop center",
@@ -135,10 +202,10 @@
     {
       "id": 7,
       "type": "MiniMaxH3SigmaShift",
-      "pos": [330, -330],
+      "pos": [620, -330],
       "size": [340, 106],
       "flags": {},
-      "order": 5,
+      "order": 9,
       "mode": 0,
       "inputs": [
         {"name": "model", "type": "MODEL", "link": 1},
@@ -152,10 +219,10 @@
     {
       "id": 8,
       "type": "KSamplerSelect",
-      "pos": [330, -150],
+      "pos": [620, -150],
       "size": [320, 60],
       "flags": {},
-      "order": 7,
+      "order": 10,
       "mode": 0,
       "inputs": [{"name": "sampler_name", "type": "COMBO", "widget": {"name": "sampler_name"}, "link": null}],
       "outputs": [{"name": "SAMPLER", "type": "SAMPLER", "links": [11]}],
@@ -165,10 +232,10 @@
     {
       "id": 9,
       "type": "BasicScheduler",
-      "pos": [330, -40],
+      "pos": [620, -40],
       "size": [340, 130],
       "flags": {},
-      "order": 8,
+      "order": 11,
       "mode": 0,
       "inputs": [
         {"name": "model", "type": "MODEL", "link": 9},
@@ -183,10 +250,10 @@
     {
       "id": 10,
       "type": "BasicGuider",
-      "pos": [330, 160],
+      "pos": [620, 160],
       "size": [340, 80],
       "flags": {},
-      "order": 9,
+      "order": 12,
       "mode": 0,
       "inputs": [
         {"name": "model", "type": "MODEL", "link": 10},
@@ -199,10 +266,10 @@
     {
       "id": 11,
       "type": "RandomNoise",
-      "pos": [330, 300],
+      "pos": [620, 300],
       "size": [340, 82],
       "flags": {},
-      "order": 10,
+      "order": 13,
       "mode": 0,
       "inputs": [{"name": "noise_seed", "type": "INT", "widget": {"name": "noise_seed"}, "link": null}],
       "outputs": [{"name": "NOISE", "type": "NOISE", "links": [14]}],
@@ -212,10 +279,10 @@
     {
       "id": 12,
       "type": "SamplerCustomAdvanced",
-      "pos": [760, -20],
+      "pos": [1050, -20],
       "size": [360, 180],
       "flags": {},
-      "order": 11,
+      "order": 14,
       "mode": 0,
       "inputs": [
         {"name": "noise", "type": "NOISE", "link": 14},
@@ -234,10 +301,10 @@
     {
       "id": 13,
       "type": "DecodeH3SingleFrame",
-      "pos": [1210, -20],
+      "pos": [1500, -20],
       "size": [360, 100],
       "flags": {},
-      "order": 12,
+      "order": 15,
       "mode": 0,
       "inputs": [
         {"name": "samples", "type": "LATENT", "link": 15},
@@ -253,10 +320,10 @@
     {
       "id": 14,
       "type": "PreviewImage",
-      "pos": [1660, -160],
+      "pos": [1950, -160],
       "size": [500, 520],
       "flags": {},
-      "order": 13,
+      "order": 16,
       "mode": 0,
       "inputs": [{"name": "images", "type": "IMAGE", "link": 16}],
       "outputs": [],
@@ -266,10 +333,10 @@
     {
       "id": 15,
       "type": "SaveImage",
-      "pos": [1660, 410],
+      "pos": [1950, 410],
       "size": [500, 100],
       "flags": {},
-      "order": 14,
+      "order": 17,
       "mode": 0,
       "inputs": [
         {"name": "images", "type": "IMAGE", "link": 17},
@@ -286,7 +353,7 @@
     [3, 3, 0, 6, 1, "VAE"],
     [4, 3, 0, 13, 1, "VAE"],
     [5, 4, 0, 6, 2, "IMAGE"],
-    [6, 5, 0, 6, 11, "IMAGE"],
+    [6, 5, 0, 16, 0, "IMAGE"],
     [7, 6, 0, 10, 1, "CONDITIONING"],
     [8, 6, 1, 12, 4, "LATENT"],
     [9, 7, 0, 9, 0, "MODEL"],
@@ -297,12 +364,15 @@
     [14, 11, 0, 12, 0, "NOISE"],
     [15, 12, 0, 13, 0, "LATENT"],
     [16, 13, 0, 14, 0, "IMAGE"],
-    [17, 13, 0, 15, 0, "IMAGE"]
+    [17, 13, 0, 15, 0, "IMAGE"],
+    [18, 16, 0, 18, 4, "H3EDIT_REFERENCE_STACK"],
+    [19, 17, 0, 18, 0, "IMAGE"],
+    [20, 18, 0, 6, 13, "H3EDIT_REFERENCE_STACK"]
   ],
   "groups": [
-    {"id": 1, "title": "1 · Pick the source photo and semantic guide", "bounding": [-960, 60, 430, 850], "color": "#3f789e", "font_size": 22, "flags": {}},
-    {"id": 2, "title": "2 · Describe the single-image edit", "bounding": [-430, -20, 700, 650], "color": "#8f6f40", "font_size": 22, "flags": {}},
-    {"id": 3, "title": "3 · Native H3 sample and decode", "bounding": [290, -380, 1320, 820], "color": "#456744", "font_size": 22, "flags": {}}
+    {"id": 1, "title": "1 · Source + mixed semantic/native reference stack", "bounding": [-1360, 60, 1190, 690], "color": "#3f789e", "font_size": 22, "flags": {}},
+    {"id": 2, "title": "2 · Describe both referenced edits", "bounding": [-160, -20, 700, 650], "color": "#8f6f40", "font_size": 22, "flags": {}},
+    {"id": 3, "title": "3 · Native H3 sample and decode", "bounding": [580, -380, 1910, 940], "color": "#456744", "font_size": 22, "flags": {}}
   ],
   "config": {},
   "extra": {"ds": {"scale": 0.72, "offset": [710, 390]}},
