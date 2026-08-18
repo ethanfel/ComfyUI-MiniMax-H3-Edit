@@ -1,0 +1,32 @@
+[project]
+name = "comfyui-minimax-h3-edit"
+version = "0.1.0"
+description = "Minimal one-frame MiniMax H3 photo editing with native or semantic references"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Ethanfel" }]
+keywords = ["comfyui", "minimax", "h3", "image-editing", "semantic-reference"]
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/ethanfel/ComfyUI-MiniMax-H3-Edit"
+Issues = "https://github.com/ethanfel/ComfyUI-MiniMax-H3-Edit/issues"
+
+[tool.comfy]
+PublisherId = "ethanfel"
+DisplayName = "MiniMax H3 Edit"
+Icon = ""
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-config --strict-markers"
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]

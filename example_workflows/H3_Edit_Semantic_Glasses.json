@@ -1,0 +1,307 @@
+{
+  "last_node_id": 15,
+  "last_link_id": 17,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "pos": [-920, -340],
+      "size": [430, 82],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {"name": "unet_name", "type": "COMBO", "widget": {"name": "unet_name"}, "link": null},
+        {"name": "weight_dtype", "type": "COMBO", "widget": {"name": "weight_dtype"}, "link": null}
+      ],
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [1]}],
+      "properties": {"Node name for S&R": "UNETLoader"},
+      "widgets_values": ["MiniMax-H3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "default"]
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "pos": [-920, -220],
+      "size": [430, 106],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {"name": "clip_name", "type": "COMBO", "widget": {"name": "clip_name"}, "link": null},
+        {"name": "type", "type": "COMBO", "widget": {"name": "type"}, "link": null},
+        {"name": "device", "shape": 7, "type": "COMBO", "widget": {"name": "device"}, "link": null}
+      ],
+      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2]}],
+      "properties": {"Node name for S&R": "CLIPLoader"},
+      "widgets_values": ["MiniMax-H3/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "minimax", "default"]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "pos": [-920, -70],
+      "size": [430, 60],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [{"name": "vae_name", "type": "COMBO", "widget": {"name": "vae_name"}, "link": null}],
+      "outputs": [{"name": "VAE", "type": "VAE", "links": [3, 4]}],
+      "properties": {"Node name for S&R": "VAELoader"},
+      "widgets_values": ["MiniMax-H3/minimax_h3_video_vae_fp16.safetensors"]
+    },
+    {
+      "id": 4,
+      "type": "LoadImage",
+      "title": "Picture 1 · Photo to edit",
+      "pos": [-920, 100],
+      "size": [350, 360],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "COMBO", "widget": {"name": "image"}, "link": null},
+        {"name": "upload", "type": "IMAGEUPLOAD", "widget": {"name": "upload"}, "link": null}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [5]},
+        {"name": "MASK", "type": "MASK", "links": null}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["source.png", "image"]
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "title": "Picture 2 · Glasses semantic guide",
+      "pos": [-920, 510],
+      "size": [350, 360],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "COMBO", "widget": {"name": "image"}, "link": null},
+        {"name": "upload", "type": "IMAGEUPLOAD", "widget": {"name": "upload"}, "link": null}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [6]},
+        {"name": "MASK", "type": "MASK", "links": null}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["semantic_guide.png", "image"]
+    },
+    {
+      "id": 6,
+      "type": "TextEncodeH3Edit",
+      "pos": [-390, 20],
+      "size": [620, 560],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {"name": "clip", "type": "CLIP", "link": 2},
+        {"name": "vae", "type": "VAE", "link": 3},
+        {"name": "source_image", "type": "IMAGE", "link": 5},
+        {"name": "prompt", "type": "STRING", "widget": {"name": "prompt"}, "link": null},
+        {"name": "reference_mode", "type": "COMBO", "widget": {"name": "reference_mode"}, "link": null},
+        {"name": "width", "type": "INT", "widget": {"name": "width"}, "link": null},
+        {"name": "height", "type": "INT", "widget": {"name": "height"}, "link": null},
+        {"name": "source_fit", "type": "COMBO", "widget": {"name": "source_fit"}, "link": null},
+        {"name": "prompt_mode", "type": "COMBO", "widget": {"name": "prompt_mode"}, "link": null},
+        {"name": "semantic_resolution", "type": "INT", "widget": {"name": "semantic_resolution"}, "link": null},
+        {"name": "native_reference_size", "type": "COMBO", "widget": {"name": "native_reference_size"}, "link": null},
+        {"name": "reference_image", "shape": 7, "type": "IMAGE", "link": 6}
+      ],
+      "outputs": [
+        {"name": "positive", "type": "CONDITIONING", "links": [7]},
+        {"name": "latent", "type": "LATENT", "links": [8]},
+        {"name": "fitted_source", "type": "IMAGE", "links": null},
+        {"name": "encoded_prompt", "type": "STRING", "links": null},
+        {"name": "info", "type": "STRING", "links": null}
+      ],
+      "properties": {"Node name for S&R": "TextEncodeH3Edit"},
+      "widgets_values": [
+        "Add the black acetate glasses from <Picture 2> to the woman. Fit them naturally to her face with realistic temples, reflections, and contact shadows. Change nothing else.",
+        "semantic (Qwen only)",
+        768,
+        1344,
+        "crop center",
+        "edit instruction",
+        1024,
+        "match output area"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "MiniMaxH3SigmaShift",
+      "pos": [330, -330],
+      "size": [340, 106],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 1},
+        {"name": "shift_video", "type": "FLOAT", "widget": {"name": "shift_video"}, "link": null},
+        {"name": "shift_audio", "type": "FLOAT", "widget": {"name": "shift_audio"}, "link": null}
+      ],
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [9, 10]}],
+      "properties": {"Node name for S&R": "MiniMaxH3SigmaShift"},
+      "widgets_values": [12.0, 3.0]
+    },
+    {
+      "id": 8,
+      "type": "KSamplerSelect",
+      "pos": [330, -150],
+      "size": [320, 60],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [{"name": "sampler_name", "type": "COMBO", "widget": {"name": "sampler_name"}, "link": null}],
+      "outputs": [{"name": "SAMPLER", "type": "SAMPLER", "links": [11]}],
+      "properties": {"Node name for S&R": "KSamplerSelect"},
+      "widgets_values": ["res_multistep"]
+    },
+    {
+      "id": 9,
+      "type": "BasicScheduler",
+      "pos": [330, -40],
+      "size": [340, 130],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 9},
+        {"name": "scheduler", "type": "COMBO", "widget": {"name": "scheduler"}, "link": null},
+        {"name": "steps", "type": "INT", "widget": {"name": "steps"}, "link": null},
+        {"name": "denoise", "type": "FLOAT", "widget": {"name": "denoise"}, "link": null}
+      ],
+      "outputs": [{"name": "SIGMAS", "type": "SIGMAS", "links": [12]}],
+      "properties": {"Node name for S&R": "BasicScheduler"},
+      "widgets_values": ["simple", 20, 1.0]
+    },
+    {
+      "id": 10,
+      "type": "BasicGuider",
+      "pos": [330, 160],
+      "size": [340, 80],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 10},
+        {"name": "conditioning", "type": "CONDITIONING", "link": 7}
+      ],
+      "outputs": [{"name": "GUIDER", "type": "GUIDER", "links": [13]}],
+      "properties": {"Node name for S&R": "BasicGuider"},
+      "widgets_values": []
+    },
+    {
+      "id": 11,
+      "type": "RandomNoise",
+      "pos": [330, 300],
+      "size": [340, 82],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [{"name": "noise_seed", "type": "INT", "widget": {"name": "noise_seed"}, "link": null}],
+      "outputs": [{"name": "NOISE", "type": "NOISE", "links": [14]}],
+      "properties": {"Node name for S&R": "RandomNoise"},
+      "widgets_values": [42, "fixed"]
+    },
+    {
+      "id": 12,
+      "type": "SamplerCustomAdvanced",
+      "pos": [760, -20],
+      "size": [360, 180],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {"name": "noise", "type": "NOISE", "link": 14},
+        {"name": "guider", "type": "GUIDER", "link": 13},
+        {"name": "sampler", "type": "SAMPLER", "link": 11},
+        {"name": "sigmas", "type": "SIGMAS", "link": 12},
+        {"name": "latent_image", "type": "LATENT", "link": 8}
+      ],
+      "outputs": [
+        {"name": "output", "type": "LATENT", "links": [15]},
+        {"name": "denoised_output", "type": "LATENT", "links": null}
+      ],
+      "properties": {"Node name for S&R": "SamplerCustomAdvanced"},
+      "widgets_values": []
+    },
+    {
+      "id": 13,
+      "type": "DecodeH3SingleFrame",
+      "pos": [1210, -20],
+      "size": [360, 100],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 15},
+        {"name": "vae", "type": "VAE", "link": 4}
+      ],
+      "outputs": [
+        {"name": "image", "type": "IMAGE", "links": [16, 17]},
+        {"name": "info", "type": "STRING", "links": null}
+      ],
+      "properties": {"Node name for S&R": "DecodeH3SingleFrame"},
+      "widgets_values": []
+    },
+    {
+      "id": 14,
+      "type": "PreviewImage",
+      "pos": [1660, -160],
+      "size": [500, 520],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [{"name": "images", "type": "IMAGE", "link": 16}],
+      "outputs": [],
+      "properties": {"Node name for S&R": "PreviewImage"},
+      "widgets_values": []
+    },
+    {
+      "id": 15,
+      "type": "SaveImage",
+      "pos": [1660, 410],
+      "size": [500, 100],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 17},
+        {"name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}, "link": null}
+      ],
+      "outputs": [],
+      "properties": {"Node name for S&R": "SaveImage"},
+      "widgets_values": ["H3Edit/%date:yyyy-MM-dd%/H3_Edit"]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 7, 0, "MODEL"],
+    [2, 2, 0, 6, 0, "CLIP"],
+    [3, 3, 0, 6, 1, "VAE"],
+    [4, 3, 0, 13, 1, "VAE"],
+    [5, 4, 0, 6, 2, "IMAGE"],
+    [6, 5, 0, 6, 11, "IMAGE"],
+    [7, 6, 0, 10, 1, "CONDITIONING"],
+    [8, 6, 1, 12, 4, "LATENT"],
+    [9, 7, 0, 9, 0, "MODEL"],
+    [10, 7, 0, 10, 0, "MODEL"],
+    [11, 8, 0, 12, 2, "SAMPLER"],
+    [12, 9, 0, 12, 3, "SIGMAS"],
+    [13, 10, 0, 12, 1, "GUIDER"],
+    [14, 11, 0, 12, 0, "NOISE"],
+    [15, 12, 0, 13, 0, "LATENT"],
+    [16, 13, 0, 14, 0, "IMAGE"],
+    [17, 13, 0, 15, 0, "IMAGE"]
+  ],
+  "groups": [
+    {"id": 1, "title": "1 · Pick the source photo and semantic guide", "bounding": [-960, 60, 430, 850], "color": "#3f789e", "font_size": 22, "flags": {}},
+    {"id": 2, "title": "2 · Describe the one-frame edit", "bounding": [-430, -20, 700, 650], "color": "#8f6f40", "font_size": 22, "flags": {}},
+    {"id": 3, "title": "3 · Native H3 sample and decode", "bounding": [290, -380, 1320, 820], "color": "#456744", "font_size": 22, "flags": {}}
+  ],
+  "config": {},
+  "extra": {"ds": {"scale": 0.72, "offset": [710, 390]}},
+  "version": 0.4
+}
