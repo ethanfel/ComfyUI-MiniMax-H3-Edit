@@ -10,6 +10,7 @@ from h3edit.nodes import (
     NATIVE_SIZE_MATCH,
     PROMPT_EDIT,
     QUALITY_EXPERIMENTAL,
+    QUALITY_MAXIMUM,
     QUALITY_RECOMMENDED,
     REFERENCE_NATIVE,
     REFERENCE_NONE,
@@ -137,15 +138,17 @@ def test_semantic_reference_is_qwen_only():
     expected_width, expected_height = semantic_target_size(_image(height=400, width=800), 1024)
     assert semantic_image.shape == (1, expected_height, expected_width, 3)
     metadata = conditioning[0][1]
-    assert metadata["minimax_frame_count"] == 22
+    assert metadata["minimax_frame_count"] == 5
     assert len(metadata["minimax_keyframes"]) == 1
     assert "minimax_refs" not in metadata
     video, audio = latent["samples"].unbind()
-    assert video.shape == (1, 24, 7, 84, 48)
-    assert audio.shape == (1, 32, 2, 37)
-    assert latent["h3edit_output_frame_index"] == 21
+    assert video.shape == (1, 24, 2, 84, 48)
+    assert audio.shape == (1, 32, 2, 8)
+    assert latent["h3edit_requested_frames"] == 5
+    assert latent["h3edit_natural_frames"] == 5
     assert "guide VAE encode skipped" in info
-    assert "internal packet 22 frames" in info
+    assert "requested context 5 frames" in info
+    assert "natural packet 5 frames" in info
 
 
 def test_native_reference_gets_qwen_and_vae_transport():
@@ -194,7 +197,23 @@ def test_experimental_profile_retains_true_one_frame_latent():
     assert audio.shape == (1, 32, 2, 2)
     assert conditioning[0][1]["minimax_frame_count"] == 1
     assert "Produce exactly one finished still image" in prompt
-    assert "internal packet 1 frames" in info
+    assert "natural packet 1 frames" in info
+
+
+def test_maximum_profile_keeps_twenty_candidates_from_natural_twenty_two():
+    _clip, _vae, (conditioning, latent, _fitted, _prompt, info) = _encode(
+        REFERENCE_NONE,
+        quality_profile=QUALITY_MAXIMUM,
+    )
+
+    video, audio = latent["samples"].unbind()
+    assert video.shape == (1, 24, 7, 84, 48)
+    assert audio.shape == (1, 32, 2, 37)
+    assert latent["h3edit_requested_frames"] == 20
+    assert latent["h3edit_natural_frames"] == 22
+    assert conditioning[0][1]["minimax_frame_count"] == 22
+    assert "requested context 20 frames" in info
+    assert "natural packet 22 frames" in info
 
 
 def test_invalid_quality_profile_is_rejected():
@@ -213,23 +232,25 @@ def test_true_one_frame_decode_extracts_video():
     assert vae.decoded == [video]
     assert image.shape == (1, 768, 1344, 3)
     assert "to 1 frame(s)" in info
-    assert "returned completed frame 0" in info
+    assert "stable-quality frame 0" in info
 
 
-def test_packet_decode_returns_only_the_completed_final_frame():
+def test_packet_decode_scores_context_and_returns_one_frame():
     vae = FakeVAE()
-    video = torch.zeros((1, 24, 7, 48, 84))
-    audio = torch.zeros((1, 32, 2, 37))
+    video = torch.zeros((1, 24, 2, 48, 84))
+    audio = torch.zeros((1, 32, 2, 8))
     samples = {
         "samples": FakeNestedTensor((video, audio)),
-        "h3edit_natural_frames": 22,
-        "h3edit_output_frame_index": 21,
+        "h3edit_requested_frames": 5,
+        "h3edit_natural_frames": 5,
     }
 
     image, info = DecodeH3SingleFrame().decode(samples, vae)
 
     assert vae.decoded == [video]
     assert image.shape == (1, 768, 1344, 3)
-    assert torch.all(image == 21)
-    assert "to 22 frame(s)" in info
-    assert "returned completed frame 21" in info
+    selected_value = int(image[0, 0, 0, 0].item())
+    assert 0 <= selected_value < 5
+    assert "to 5 frame(s)" in info
+    assert "scored 5 requested candidate(s)" in info
+    assert f"stable-quality frame {selected_value}" in info

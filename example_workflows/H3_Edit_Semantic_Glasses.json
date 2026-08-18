@@ -128,7 +128,7 @@
         "edit instruction",
         1024,
         "match output area",
-        "recommended | 22-frame context -> 1 image"
+        "recommended | 5-frame context -> 1 image"
       ]
     },
     {

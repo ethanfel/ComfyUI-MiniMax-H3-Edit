@@ -18,16 +18,16 @@ H3_AUDIO_STEREO = 2
 FPS = 24
 AUDIO_LATENT_FPS = 40
 
-QUALITY_RECOMMENDED = "recommended | 22-frame context -> 1 image"
-QUALITY_FAST = "fast | 5-frame context -> 1 image"
-QUALITY_HIGH = "high | 39-frame context -> 1 image"
-QUALITY_MAXIMUM = "maximum | 56-frame context -> 1 image"
+QUALITY_RECOMMENDED = "recommended | 5-frame context -> 1 image"
+QUALITY_EXTENDED = "extended | 9-frame context -> 1 image"
+QUALITY_HIGH = "high | 13-frame context -> 1 image"
+QUALITY_MAXIMUM = "maximum | 20-frame context -> 1 image"
 QUALITY_EXPERIMENTAL = "experimental | true 1 frame (low quality)"
 QUALITY_PROFILES = {
-    QUALITY_RECOMMENDED: 22,
-    QUALITY_FAST: 5,
-    QUALITY_HIGH: 39,
-    QUALITY_MAXIMUM: 56,
+    QUALITY_RECOMMENDED: 5,
+    QUALITY_EXTENDED: 9,
+    QUALITY_HIGH: 13,
+    QUALITY_MAXIMUM: 20,
     QUALITY_EXPERIMENTAL: 1,
 }
 
@@ -197,7 +197,7 @@ def _build_prompt(prompt: str, prompt_mode: str, reference_mode: str, frame_coun
         else (
             " Apply the edit immediately after the source anchor, then hold the fully completed result unchanged "
             "across the short internal frame packet: locked camera, fixed composition, no subject motion, and no "
-            "temporal progression. The final frame must be a crisp finished still image."
+            "temporal progression. Every generated frame must read as a crisp finished still image."
         )
     )
     return (
@@ -217,11 +217,6 @@ def _decoded_frames_for_latent_t(latent_t: int) -> int:
 
 def _latent_t_for_frame_count(frame_count: int) -> tuple[int, int]:
     requested = max(1, int(frame_count))
-    if requested == 1:
-        return 1, 1
-    requested = max(5, requested)
-    while requested % 17 != 5:
-        requested += 1
     latent_t = 1
     while _decoded_frames_for_latent_t(latent_t) < requested:
         latent_t += 1
@@ -245,12 +240,71 @@ def _empty_h3_edit_latent(width: int, height: int, frame_count: int) -> tuple[di
             "samples": nested_tensor.NestedTensor((video, audio)),
             "h3edit_requested_frames": requested_frames,
             "h3edit_natural_frames": natural_frames,
-            "h3edit_output_frame_index": natural_frames - 1,
             "h3edit_width": width,
             "h3edit_height": height,
         },
         natural_frames,
     )
+
+
+def _minmax(values: torch.Tensor) -> torch.Tensor:
+    low = values.min()
+    high = values.max()
+    if float((high - low).abs()) < 1e-8:
+        return torch.ones_like(values)
+    return (values - low) / (high - low)
+
+
+def _stable_quality_frame(frames: torch.Tensor, max_side: int = 512) -> tuple[int, float]:
+    """Choose one sharp, clean, temporally stable frame using Studio's lightweight metrics."""
+    if not isinstance(frames, torch.Tensor) or frames.ndim != 4 or frames.shape[0] < 1:
+        raise ValueError("Stable frame selection expects a non-empty IMAGE batch [T,H,W,C].")
+    if frames.shape[0] == 1:
+        return 0, 1.0
+
+    samples = frames[..., :3].movedim(-1, 1)
+    height, width = samples.shape[-2:]
+    scale = min(1.0, max_side / max(height, width))
+    if scale < 1.0:
+        target = (max(16, round(height * scale)), max(16, round(width * scale)))
+        metric_chunks = []
+        for chunk in samples.split(4, dim=0):
+            metric_chunks.append(
+                F.interpolate(
+                    chunk.float(),
+                    size=target,
+                    mode="bilinear",
+                    align_corners=False,
+                    antialias=True,
+                )
+            )
+        x = torch.cat(metric_chunks, dim=0).clamp(0.0, 1.0)
+    else:
+        x = samples.float().clamp(0.0, 1.0)
+
+    gray = 0.2126 * x[:, 0:1] + 0.7152 * x[:, 1:2] + 0.0722 * x[:, 2:3]
+    lap_kernel = torch.tensor(
+        [[0.0, 1.0, 0.0], [1.0, -4.0, 1.0], [0.0, 1.0, 0.0]],
+        device=x.device,
+        dtype=x.dtype,
+    ).view(1, 1, 3, 3)
+    laplacian = F.conv2d(gray, lap_kernel, padding=1)
+    sharpness = torch.log1p(laplacian.var(dim=(1, 2, 3)) * 1000.0)
+    contrast = gray.std(dim=(1, 2, 3))
+    clipped = ((x < 0.01) | (x > 0.99)).float().mean(dim=(1, 2, 3))
+    exposure = (1.0 - clipped * 3.0).clamp(0.0, 1.0)
+    quality = 0.70 * _minmax(sharpness) + 0.20 * _minmax(contrast) + 0.10 * exposure
+
+    temporal_delta = torch.empty(x.shape[0], device=x.device, dtype=x.dtype)
+    temporal_delta[0] = (x[0] - x[1]).abs().mean()
+    temporal_delta[-1] = (x[-1] - x[-2]).abs().mean()
+    if x.shape[0] > 2:
+        temporal_delta[1:-1] = 0.5 * (x[1:-1] - x[:-2]).abs().mean(dim=(1, 2, 3))
+        temporal_delta[1:-1] += 0.5 * (x[1:-1] - x[2:]).abs().mean(dim=(1, 2, 3))
+    stability = 1.0 - _minmax(temporal_delta)
+    scores = 0.80 * quality + 0.20 * stability
+    selected = int(torch.argmax(scores).item())
+    return selected, float(scores[selected].item())
 
 
 class TextEncodeH3Edit:
@@ -344,8 +398,8 @@ class TextEncodeH3Edit:
                     {
                         "default": QUALITY_RECOMMENDED,
                         "tooltip": (
-                            "H3 is video-trained. Recommended generates a short 22-frame context and the decoder returns "
-                            "only its completed final frame. True 1-frame mode is faster but often poor quality."
+                            "H3 is video-trained. Recommended matches Studio's short 5-frame context, then the decoder "
+                            "automatically returns one stable high-quality frame. True 1-frame mode is often poor quality."
                         ),
                     },
                 ),
@@ -455,10 +509,11 @@ class TextEncodeH3Edit:
             else ""
         )
         info = (
-            f"Single-image H3 edit | {quality_profile} | internal packet {natural_frames} frames | "
+            f"Single-image H3 edit | {quality_profile} | requested context {requested_frames} frames | "
+            f"natural packet {natural_frames} frames | "
             f"output {width}x{height} | Picture 1 native frame-zero keyframe "
             f"({tuple(source_latent.shape)}) | {reference_note}{ignored_note} "
-            "Decode H3 Edit to One Image returns only the completed final still."
+            "Decode H3 Edit to One Image scores the decoded context and returns one stable high-quality still."
         )
         return conditioning, latent, fitted_source, encoded_prompt, info
 
@@ -467,8 +522,8 @@ class DecodeH3SingleFrame:
     """Decode an H3 edit packet and return exactly one completed still."""
 
     DESCRIPTION = (
-        "Decodes the video stream from an H3 edit latent and returns exactly one image. Quality profiles select the "
-        "last completed frame from a short hidden packet; experimental true-one-frame input remains supported."
+        "Decodes the complete video stream from an H3 edit latent, scores sharpness, exposure, contrast, and temporal "
+        "stability, and returns exactly one image. Experimental true-one-frame input remains supported."
     )
 
     @classmethod
@@ -497,30 +552,28 @@ class DecodeH3SingleFrame:
             raise ValueError("The MiniMax H3 VAE returned a non-tensor result.")
         if decoded.ndim == 5:
             decoded_frames = int(decoded.shape[1])
-            frame_index = min(
-                max(0, int(samples.get("h3edit_output_frame_index", decoded_frames - 1))),
-                decoded_frames - 1,
-            )
-            image = decoded[:, frame_index]
+            frames = decoded[0]
         elif decoded.ndim == 4:
             expected_frames = max(1, int(samples.get("h3edit_natural_frames", 1)))
             if int(video.shape[0]) == 1 and expected_frames > 1 and int(decoded.shape[0]) >= expected_frames:
                 decoded_frames = int(decoded.shape[0])
-                frame_index = min(
-                    max(0, int(samples.get("h3edit_output_frame_index", expected_frames - 1))),
-                    decoded_frames - 1,
-                )
-                image = decoded[frame_index : frame_index + 1]
+                frames = decoded
             else:
                 decoded_frames = 1
-                frame_index = 0
-                image = decoded
+                frames = decoded[:1]
         else:
             raise ValueError(f"Unexpected H3 VAE output shape {tuple(decoded.shape)}.")
+
+        requested_frames = max(1, int(samples.get("h3edit_requested_frames", decoded_frames)))
+        candidate_count = min(requested_frames, decoded_frames)
+        candidates = frames[:candidate_count]
+        frame_index, score = _stable_quality_frame(candidates)
+        image = candidates[frame_index : frame_index + 1].clone()
         return (
             image,
-            f"Decoded H3 latent {tuple(video.shape)} to {decoded_frames} frame(s); returned completed frame "
-            f"{frame_index} as one image {tuple(image.shape)}.",
+            f"Decoded H3 latent {tuple(video.shape)} to {decoded_frames} frame(s); scored {candidate_count} requested "
+            f"candidate(s) and returned stable-quality frame {frame_index} (score {score:.4f}) as one image "
+            f"{tuple(image.shape)}.",
         )
 
 
