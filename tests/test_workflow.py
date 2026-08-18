@@ -55,7 +55,7 @@ def test_example_workflow_links_are_internally_consistent():
 def test_character_sheet_workflow_uses_ref2va_orbit_and_pack_decoder():
     _graph, nodes = _load_validated_workflow(CHARACTER_WORKFLOW)
 
-    assert len(nodes) == 19
+    assert len(nodes) == 20
     assert "ref2va" in nodes[1]["widgets_values"][0]
     assert nodes[7]["type"] == "AddH3EditReference"
     assert nodes[8]["type"] == "AddH3EditReference"
@@ -77,3 +77,8 @@ def test_character_sheet_workflow_uses_ref2va_orbit_and_pack_decoder():
     assert decoder["outputs"][2]["name"] == "all_frames"
     assert nodes[18]["mode"] == 4
     assert nodes[19]["mode"] == 4
+
+    credit = nodes[20]
+    assert credit["type"] == "MarkdownNote"
+    assert "C_Nugget" in credit["widgets_values"][0]
+    assert "https://huggingface.co/PoopMan333/H3_Character_Sheet_Generator" in credit["widgets_values"][0]

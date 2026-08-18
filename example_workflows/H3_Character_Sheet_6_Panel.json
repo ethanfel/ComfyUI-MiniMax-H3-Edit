@@ -1,5 +1,5 @@
 {
-  "last_node_id": 19,
+  "last_node_id": 20,
   "last_link_id": 21,
   "nodes": [
     {
@@ -375,6 +375,22 @@
       "outputs": [],
       "properties": {"Node name for S&R": "SaveImage"},
       "widgets_values": ["H3CharacterSheet/%date:yyyy-MM-dd%/frames/frame"]
+    },
+    {
+      "id": 20,
+      "type": "MarkdownNote",
+      "title": "Credit · Original character-sheet workflow by C_Nugget",
+      "pos": [-1320, 800],
+      "size": [1110, 250],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "## Credit and inspiration\n\nThis lightweight workflow adapts the continuous H3 orbit and calibrated panel-selection method created by **C_Nugget**. The original project includes four-panel and six-panel workflows, prompt templates, examples, and detailed usage advice.\n\n### [Open C_Nugget's original H3 Character Sheet Generator on Hugging Face](https://huggingface.co/PoopMan333/H3_Character_Sheet_Generator)\n\nPlease visit and support the original project. This adaptation replaces its conditioning and stitching graph with the ComfyUI MiniMax H3 Edit / Generate pack's scalable reference stack, structured prompt compiler, and character-sheet decoder."
+      ]
     }
   ],
   "links": [
@@ -405,7 +421,8 @@
     {"id": 2, "title": "2 · Ordered character references", "bounding": [-1360, 60, 1190, 690], "color": "#496b8a", "font_size": 22, "flags": {}},
     {"id": 3, "title": "3 · Character definition and 124-frame orbit", "bounding": [-160, -20, 730, 740], "color": "#8f6f40", "font_size": 22, "flags": {}},
     {"id": 4, "title": "4 · Sample and extract calibrated views", "bounding": [580, -310, 1360, 620], "color": "#456744", "font_size": 22, "flags": {}},
-    {"id": 5, "title": "5 · Sheet and optional frame outputs", "bounding": [1940, -290, 650, 1090], "color": "#6f4c7a", "font_size": 22, "flags": {}}
+    {"id": 5, "title": "5 · Sheet and optional frame outputs", "bounding": [1940, -290, 650, 1090], "color": "#6f4c7a", "font_size": 22, "flags": {}},
+    {"id": 6, "title": "Credit · Please visit the original project", "bounding": [-1360, 760, 1190, 330], "color": "#7a5b32", "font_size": 22, "flags": {}}
   ],
   "config": {},
   "extra": {"ds": {"scale": 0.67, "offset": [760, 390]}},
