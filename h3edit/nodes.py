@@ -23,6 +23,7 @@ QUALITY_EXTENDED = "extended | 9-frame context -> 1 image"
 QUALITY_HIGH = "high | 13-frame context -> 1 image"
 QUALITY_MAXIMUM = "maximum | 20-frame context -> 1 image"
 QUALITY_EXPERIMENTAL = "experimental | true 1 frame (low quality)"
+QUALITY_DIRECTED_CHANGE = "directed change | 39-frame settle -> 1 image"
 QUALITY_CHARACTER_FOUR = "character sheet | 4 panels / 73-frame orbit"
 QUALITY_CHARACTER_SIX = "character sheet | 6 panels / 124-frame orbit"
 QUALITY_PROFILES = {
@@ -31,6 +32,7 @@ QUALITY_PROFILES = {
     QUALITY_HIGH: 13,
     QUALITY_MAXIMUM: 20,
     QUALITY_EXPERIMENTAL: 1,
+    QUALITY_DIRECTED_CHANGE: 39,
     QUALITY_CHARACTER_FOUR: 73,
     QUALITY_CHARACTER_SIX: 124,
 }
@@ -57,8 +59,12 @@ PRIMARY_NATIVE_REFERENCE = "generate | native Picture 1 (REF2VA)"
 PRIMARY_IMAGE_ROLES = [PRIMARY_EDIT_ANCHOR, PRIMARY_SEMANTIC_REFERENCE, PRIMARY_NATIVE_REFERENCE]
 
 PROMPT_EDIT = "edit instruction"
+PROMPT_REPOSE = "directed | re-pose character"
+PROMPT_CHARACTER_SWAP = "directed | character swap"
+PROMPT_NEW_ANGLE = "directed | new camera angle"
 PROMPT_VERBATIM = "use prompt verbatim"
-PROMPT_MODES = [PROMPT_EDIT, PROMPT_VERBATIM]
+DIRECTED_PROMPT_MODES = [PROMPT_REPOSE, PROMPT_CHARACTER_SWAP, PROMPT_NEW_ANGLE]
+PROMPT_MODES = [PROMPT_EDIT, *DIRECTED_PROMPT_MODES, PROMPT_VERBATIM]
 
 SOURCE_FIT_MODES = ["crop center", "contain / pad", "stretch"]
 NATIVE_SIZE_MATCH = "match output area"
@@ -300,6 +306,68 @@ def _build_character_sheet_prompt(
     )
 
 
+def _build_directed_change_prompt(
+    prompt: str,
+    prompt_mode: str,
+    reference_modes: list[str],
+    frame_count: int,
+) -> str:
+    duration = frame_count / FPS
+    settle_time = duration * 0.65
+    guide_notes = " ".join(
+        (
+            f"<Picture {ordinal}> is a semantic Qwen-only guide with no timeline alignment or VAE pixel anchor; "
+            "use only the role explicitly assigned in the requested transformation."
+            if reference_mode == REFERENCE_SEMANTIC
+            else f"<Picture {ordinal}> is a native Qwen+VAE guide with no timeline alignment; use its detailed "
+            "appearance only for the role explicitly assigned in the requested transformation."
+        )
+        for ordinal, reference_mode in enumerate(reference_modes, start=2)
+    )
+
+    if prompt_mode == PROMPT_REPOSE:
+        action = (
+            "The camera remains completely static. Immediately after the first frame, the person smoothly changes only "
+            "their body pose toward the requested target pose. Preserve identity, facial structure, hairstyle, physique, "
+            "clothing design, fabric construction, colors, accessories, environment, lighting, framing, lens, and camera "
+            "position. Transfer limb placement, torso orientation, head direction, hand positions, weight distribution, "
+            "and expression only when the request assigns them. Do not inherit a pose guide's identity, clothing, scene, "
+            "or lighting. Maintain natural joint motion, correct anatomy, intact hands, and stable garment topology."
+        )
+        result = "the character is fully settled into the requested new pose"
+    elif prompt_mode == PROMPT_CHARACTER_SWAP:
+        action = (
+            "The camera remains completely static. Immediately after the first frame, replace only the source character "
+            "with the requested reference character. Preserve the source scene geometry, subject placement, pose, action, "
+            "framing, camera, perspective, lighting, shadows, contact points, and every unaffected object. Transfer only "
+            "the identity, face, skin, hair, physique, wardrobe, or accessories explicitly assigned by the request. Do not "
+            "copy a donor background, camera angle, pose, lighting, or unrelated person. The replacement must integrate "
+            "with correct anatomy, occlusion, perspective, environmental light, cast shadows, and contact shadows."
+        )
+        result = "the replacement character is fully integrated and every source-scene detail is stable"
+    else:
+        action = (
+            "The subject and world remain rigidly frozen while only the camera moves in one smooth controlled arc from the "
+            "source viewpoint to the requested new viewpoint. Preserve character identity, anatomy, pose, expression, "
+            "wardrobe construction, props, environment geometry, object placement, materials, colors, and lighting. The "
+            "camera movement must follow the requested azimuth, elevation, distance, framing, and lens behavior without "
+            "zoom drift, roll, shake, subject motion, or scene morphing. Reconstruct newly visible surfaces consistently "
+            "from the references and do not invent duplicate objects or accessories."
+        )
+        result = "the camera is locked at the requested new angle and the reconstructed view is fully stable"
+
+    return (
+        "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\n"
+        "integrated_multimodal_description: [Shot 1] The target begins from the exact composition, pixels, subjects, "
+        "environment, and lighting established by <Picture 1>. "
+        f"{guide_notes} Requested transformation: {prompt} {action} Complete the controlled change by "
+        f"00:{settle_time:06.3f}; from that point through 00:{duration:06.3f}, {result}. Hold the completed result "
+        "perfectly unchanged across every remaining frame so the tail is a sequence of crisp matching stills.\n\n"
+        "overall_soundscape: N/A\n\n"
+        "non_diegetic_music: N/A"
+    )
+
+
 def _build_prompt(
     prompt: str,
     prompt_mode: str,
@@ -313,6 +381,9 @@ def _build_prompt(
 
     if frame_count in {73, 124}:
         return _build_character_sheet_prompt(prompt, reference_modes, primary_image_role, frame_count)
+
+    if prompt_mode in DIRECTED_PROMPT_MODES:
+        return _build_directed_change_prompt(prompt, prompt_mode, reference_modes, frame_count)
 
     if primary_image_role == PRIMARY_EDIT_ANCHOR:
         guide = "".join(
@@ -626,7 +697,10 @@ class TextEncodeH3Edit:
                     PROMPT_MODES,
                     {
                         "default": PROMPT_EDIT,
-                        "tooltip": "Edit instruction adds a concise preservation wrapper. Verbatim sends your text unchanged.",
+                        "tooltip": (
+                            "Choose ordinary edit/generation, an anchored directed transformation, or verbatim text. "
+                            "Directed tasks require the 39-frame settle profile."
+                        ),
                     },
                 ),
                 "semantic_resolution": (
@@ -720,6 +794,11 @@ class TextEncodeH3Edit:
             raise ValueError(f"Unknown prompt_mode: {prompt_mode}")
         if quality_profile not in QUALITY_PROFILES:
             raise ValueError(f"Unknown quality_profile: {quality_profile}")
+        directed_task = prompt_mode in DIRECTED_PROMPT_MODES
+        if directed_task and primary_image_role != PRIMARY_EDIT_ANCHOR:
+            raise ValueError("Directed re-pose, character-swap, and camera-angle tasks require the strong Picture 1 anchor.")
+        if directed_task and quality_profile != QUALITY_DIRECTED_CHANGE:
+            raise ValueError("Directed tasks require 'directed change | 39-frame settle -> 1 image'.")
         if quality_profile in CHARACTER_SHEET_FRAME_INDICES and primary_image_role == PRIMARY_EDIT_ANCHOR:
             raise ValueError(
                 "Character-sheet profiles require semantic or native generation mode; Picture 1 cannot be a frame anchor."
@@ -787,6 +866,9 @@ class TextEncodeH3Edit:
                     }
                 )
 
+        if prompt_mode in {PROMPT_REPOSE, PROMPT_CHARACTER_SWAP} and not reference_specs:
+            raise ValueError(f"{prompt_mode} requires at least one connected guide after Picture 1.")
+
         reference_notes = []
         semantic_count = 0
         native_count = 0
@@ -847,6 +929,10 @@ class TextEncodeH3Edit:
 
         requested_frames = QUALITY_PROFILES[quality_profile]
         latent, natural_frames = _empty_h3_edit_latent(width, height, requested_frames)
+        if quality_profile == QUALITY_DIRECTED_CHANGE:
+            latent["h3edit_selection_strategy"] = "settled_tail"
+            latent["h3edit_tail_candidates"] = 5
+            latent["h3edit_directed_task"] = prompt_mode
         additional_modes = [item["transport"] for item in reference_specs]
         if not anchored_edit:
             additional_modes = additional_modes[1:]
@@ -868,15 +954,21 @@ class TextEncodeH3Edit:
 
         ignored_note = " The direct reference_image is intentionally ignored." if ignored_direct else ""
         if anchored_edit:
-            mode_note = f"Strong-anchor edit | Picture 1 native frame-zero keyframe ({tuple(source_latent.shape)})"
+            task_label = f" | {prompt_mode}" if directed_task else ""
+            mode_note = (
+                f"Strong-anchor edit{task_label} | Picture 1 native frame-zero keyframe ({tuple(source_latent.shape)})"
+            )
         else:
             route = "REF2VA" if native_count else "FL2VA"
             mode_note = f"Reference-driven generation | no frame-zero keyframe | expected route {route}"
-        decoder_note = (
-            "Decode H3 Character Sheet extracts the calibrated views and returns a stitched sheet."
-            if quality_profile in CHARACTER_SHEET_FRAME_INDICES
-            else "Decode H3 Edit to One Image scores the decoded context and returns one stable high-quality still."
-        )
+        if quality_profile in CHARACTER_SHEET_FRAME_INDICES:
+            decoder_note = "Decode H3 Character Sheet extracts the calibrated views and returns a stitched sheet."
+        elif quality_profile == QUALITY_DIRECTED_CHANGE:
+            decoder_note = (
+                "Decode H3 Edit to One Image scores only the settled tail and returns the completed transformation."
+            )
+        else:
+            decoder_note = "Decode H3 Edit to One Image scores the decoded context and returns one stable high-quality still."
         info = (
             f"{mode_note} | {quality_profile} | requested context {requested_frames} frames | "
             f"natural packet {natural_frames} frames | "
@@ -974,14 +1066,26 @@ class DecodeH3SingleFrame:
 
         requested_frames = max(1, int(samples.get("h3edit_requested_frames", decoded_frames)))
         candidate_count = min(requested_frames, decoded_frames)
-        candidates = frames[:candidate_count]
-        frame_index, score = _stable_quality_frame(candidates)
-        image = candidates[frame_index : frame_index + 1].clone()
+        selection_strategy = str(samples.get("h3edit_selection_strategy", "full_context"))
+        if selection_strategy == "settled_tail":
+            tail_count = min(candidate_count, max(1, int(samples.get("h3edit_tail_candidates", 5))))
+            first_candidate = candidate_count - tail_count
+            candidates = frames[first_candidate:candidate_count]
+        else:
+            first_candidate = 0
+            candidates = frames[:candidate_count]
+        relative_index, score = _stable_quality_frame(candidates)
+        frame_index = first_candidate + relative_index
+        image = frames[frame_index : frame_index + 1].clone()
+        selection_note = (
+            f"settled-tail frames {first_candidate}-{candidate_count - 1}"
+            if selection_strategy == "settled_tail"
+            else f"{candidate_count} requested candidate(s)"
+        )
         return (
             image,
-            f"Decoded H3 latent {tuple(video.shape)} to {decoded_frames} frame(s); scored {candidate_count} requested "
-            f"candidate(s) and returned stable-quality frame {frame_index} (score {score:.4f}) as one image "
-            f"{tuple(image.shape)}.",
+            f"Decoded H3 latent {tuple(video.shape)} to {decoded_frames} frame(s); scored {selection_note} and returned "
+            f"stable-quality frame {frame_index} (score {score:.4f}) as one image {tuple(image.shape)}.",
         )
 
 

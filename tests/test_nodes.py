@@ -13,9 +13,13 @@ from h3edit.nodes import (
     PRIMARY_EDIT_ANCHOR,
     PRIMARY_NATIVE_REFERENCE,
     PRIMARY_SEMANTIC_REFERENCE,
+    PROMPT_CHARACTER_SWAP,
     PROMPT_EDIT,
+    PROMPT_NEW_ANGLE,
+    PROMPT_REPOSE,
     QUALITY_CHARACTER_FOUR,
     QUALITY_CHARACTER_SIX,
+    QUALITY_DIRECTED_CHANGE,
     QUALITY_EXPERIMENTAL,
     QUALITY_MAXIMUM,
     QUALITY_RECOMMENDED,
@@ -102,6 +106,8 @@ def _encode(
     quality_profile=QUALITY_RECOMMENDED,
     reference_stack=None,
     primary_image_role=PRIMARY_EDIT_ANCHOR,
+    prompt_mode=PROMPT_EDIT,
+    prompt="Add the glasses from Picture 2.",
 ):
     clip = FakeClip()
     vae = FakeVAE()
@@ -109,12 +115,12 @@ def _encode(
         clip=clip,
         vae=vae,
         source_image=_image(),
-        prompt="Add the glasses from Picture 2.",
+        prompt=prompt,
         reference_mode=reference_mode,
         width=768,
         height=1344,
         source_fit="crop center",
-        prompt_mode=PROMPT_EDIT,
+        prompt_mode=prompt_mode,
         semantic_resolution=semantic_resolution,
         native_reference_size=NATIVE_SIZE_MATCH,
         primary_image_role=primary_image_role,
@@ -292,6 +298,106 @@ def test_character_profile_rejects_strong_source_anchor():
         )
 
 
+def test_directed_repose_builds_anchored_i2va_settle_packet():
+    clip, vae, (conditioning, latent, _prepared_primary, prompt, info) = _encode(
+        REFERENCE_SEMANTIC,
+        _image(height=900, width=600),
+        quality_profile=QUALITY_DIRECTED_CHANGE,
+        prompt_mode=PROMPT_REPOSE,
+        prompt=(
+            "Use <Picture 2> only for the target pose: left hand on hip, right arm relaxed, "
+            "weight on the left leg."
+        ),
+    )
+
+    video, audio = latent["samples"].unbind()
+    assert video.shape == (1, 24, 12, 84, 48)
+    assert audio.shape == (1, 32, 2, 65)
+    assert latent["h3edit_requested_frames"] == 39
+    assert latent["h3edit_natural_frames"] == 39
+    assert latent["h3edit_selection_strategy"] == "settled_tail"
+    assert latent["h3edit_tail_candidates"] == 5
+    assert latent["h3edit_directed_task"] == PROMPT_REPOSE
+    assert len(vae.encoded) == 1
+    assert len(clip.tokenize_calls[0][1]["minimax_ref_items"]) == 2
+    assert len(conditioning[0][1]["minimax_keyframes"]) == 1
+    assert "minimax_refs" not in conditioning[0][1]
+    assert prompt.startswith(
+        "For the target video, at 0.00 seconds into the target video, "
+        "<Picture 1> (from [Shot 1]) is fully referenced."
+    )
+    assert prompt.index("integrated_multimodal_description:") < prompt.index("overall_soundscape:")
+    assert prompt.index("overall_soundscape:") < prompt.index("non_diegetic_music:")
+    assert "camera remains completely static" in prompt
+    assert "changes only their body pose" in prompt
+    assert "00:01.056" in prompt
+    assert "00:01.625" in prompt
+    assert "directed | re-pose character" in info
+    assert "scores only the settled tail" in info
+
+
+def test_directed_character_swap_locks_source_pose_and_scene():
+    _clip, _vae, (conditioning, _latent, _prepared_primary, prompt, _info) = _encode(
+        REFERENCE_SEMANTIC,
+        _image(height=1024, width=768),
+        quality_profile=QUALITY_DIRECTED_CHANGE,
+        prompt_mode=PROMPT_CHARACTER_SWAP,
+        prompt="Replace the woman with the woman from <Picture 2>, including her face, hair, and wardrobe.",
+    )
+
+    assert len(conditioning[0][1]["minimax_keyframes"]) == 1
+    assert "replace only the source character" in prompt
+    assert "Preserve the source scene geometry, subject placement, pose" in prompt
+    assert "Do not copy a donor background, camera angle, pose" in prompt
+    assert "replacement character is fully integrated" in prompt
+
+
+def test_directed_new_camera_angle_can_run_without_an_extra_guide():
+    clip, _vae, (conditioning, latent, _prepared_primary, prompt, info) = _encode(
+        REFERENCE_NONE,
+        quality_profile=QUALITY_DIRECTED_CHANGE,
+        prompt_mode=PROMPT_NEW_ANGLE,
+        prompt="Arc 45 degrees to camera right at the same height and focal length, keeping a medium shot.",
+    )
+
+    assert len(clip.tokenize_calls[0][1]["minimax_ref_items"]) == 1
+    assert len(conditioning[0][1]["minimax_keyframes"]) == 1
+    assert latent["h3edit_directed_task"] == PROMPT_NEW_ANGLE
+    assert "only the camera moves in one smooth controlled arc" in prompt
+    assert "subject and world remain rigidly frozen" in prompt
+    assert "Reconstruct newly visible surfaces consistently" in prompt
+    assert PROMPT_NEW_ANGLE in info
+
+
+@pytest.mark.parametrize("prompt_mode", [PROMPT_REPOSE, PROMPT_CHARACTER_SWAP])
+def test_directed_character_tasks_require_a_guide(prompt_mode):
+    with pytest.raises(ValueError, match="requires at least one connected guide"):
+        _encode(
+            REFERENCE_NONE,
+            quality_profile=QUALITY_DIRECTED_CHANGE,
+            prompt_mode=prompt_mode,
+        )
+
+
+def test_directed_tasks_require_strong_anchor_and_directed_profile():
+    with pytest.raises(ValueError, match="require the strong Picture 1 anchor"):
+        _encode(
+            REFERENCE_SEMANTIC,
+            _image(),
+            quality_profile=QUALITY_DIRECTED_CHANGE,
+            primary_image_role=PRIMARY_SEMANTIC_REFERENCE,
+            prompt_mode=PROMPT_REPOSE,
+        )
+
+    with pytest.raises(ValueError, match="require 'directed change"):
+        _encode(
+            REFERENCE_SEMANTIC,
+            _image(),
+            quality_profile=QUALITY_RECOMMENDED,
+            prompt_mode=PROMPT_REPOSE,
+        )
+
+
 def test_none_mode_can_leave_reference_socket_connected():
     clip, vae, (conditioning, _latent, _fitted, _prompt, info) = _encode(
         REFERENCE_NONE,
@@ -429,6 +535,29 @@ def test_packet_decode_scores_context_and_returns_one_frame():
     assert 0 <= selected_value < 5
     assert "to 5 frame(s)" in info
     assert "scored 5 requested candidate(s)" in info
+    assert f"stable-quality frame {selected_value}" in info
+
+
+def test_directed_decode_scores_only_the_settled_tail():
+    vae = FakeVAE()
+    video = torch.zeros((1, 24, 12, 48, 84))
+    audio = torch.zeros((1, 32, 2, 65))
+    samples = {
+        "samples": FakeNestedTensor((video, audio)),
+        "h3edit_requested_frames": 39,
+        "h3edit_natural_frames": 39,
+        "h3edit_selection_strategy": "settled_tail",
+        "h3edit_tail_candidates": 5,
+    }
+
+    image, info = DecodeH3SingleFrame().decode(samples, vae)
+
+    assert vae.decoded == [video]
+    assert image.shape == (1, 768, 1344, 3)
+    selected_value = int(image[0, 0, 0, 0].item())
+    assert 34 <= selected_value <= 38
+    assert "to 39 frame(s)" in info
+    assert "scored settled-tail frames 34-38" in info
     assert f"stable-quality frame {selected_value}" in info
 
 

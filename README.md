@@ -71,6 +71,20 @@ Use a generation role rather than the strong edit anchor. Native Picture 1 plus 
 
 The included [six-panel character-sheet workflow](example_workflows/H3_Character_Sheet_6_Panel.json) uses three chained native references, 768x1344 frames, Euler sampling, the linear-quadratic scheduler, 25 steps, and a REF2VA checkpoint. The optional selected-view and all-frame save nodes are bypassed by default. Add, remove, or change builder transports as needed; the final builder always connects to `reference_stack`.
 
+## Directed transformations
+
+The three directed prompt presets turn a still edit into one tightly constrained H3 motion, let it settle, and extract the finished result as one image. They always use Picture 1 as a strong FL2VA frame-zero anchor and the `directed change | 39-frame settle -> 1 image` profile. The prompt compiler asks H3 to complete the change by 65% of the 39-frame sequence and hold it perfectly still; the decoder then scores only zero-based frames 34–38.
+
+| Prompt preset | Picture 2 | Allowed change | Locked elements |
+|---|---|---|---|
+| `directed \| re-pose character` | Required pose guide; semantic recommended | Body pose and explicitly requested expression | Identity, wardrobe, scene, lighting, lens, framing, camera |
+| `directed \| character swap` | Required donor character; semantic recommended | Explicitly assigned identity, face, hair, physique, wardrobe, accessories | Source pose, placement, action, scene, camera, perspective, lighting |
+| `directed \| new camera angle` | Optional angle/composition guide | One smooth camera arc to the requested azimuth, elevation, distance, and framing | Subject, pose, expression, wardrobe, props, world geometry, lighting |
+
+Write only the transformation you want. The selected preset rewrites it into the full timed I2VA prompt, including the Picture 1 alignment line, preservation rules, controlled-motion phase, settled tail, and silent audio fields. Re-pose and character swap reject a missing guide; new camera angle can run from Picture 1 and text alone. Additional semantic or native guides can be chained as usual, although native guides mixed with the frame-zero FL2VA keyframe remain experimental.
+
+The included [directed-transformations workflow](example_workflows/H3_Directed_Transformations.json) defaults to semantic re-posing with Euler, the linear-quadratic scheduler, and 25 steps. Its visible note contains example instructions for all three presets and credits the continuous-camera method that inspired this extension.
+
 ## Quality profiles
 
 The quality selector chooses the temporal context. Still profiles feed the one-image decoder; character-sheet profiles feed the sheet decoder.
@@ -82,10 +96,11 @@ The quality selector chooses the temporal context. Still profiles feed the one-i
 | `high` | 13 | 4 | Additional temporal context for difficult edits |
 | `maximum` | 20 | 7 | Slowest option; its natural 22-frame decode is cropped to 20 candidates |
 | `experimental` | 1 | 1 | Literal one-frame path retained for comparison; often poor quality |
+| `directed change` | 39 | 12 | One controlled transformation; decoder scores settled tail frames 34–38 |
 | `character sheet · 4 panels` | 73 | 22 | 180-degree body orbit plus front facial view |
 | `character sheet · 6 panels` | 124 | 37 | 360-degree body orbit plus two facial views |
 
-The first five entries are Studio-style compact still-image profiles. Their prompt asks for a locked camera and an immediately completed result held unchanged, then the still decoder scores sharpness, contrast, exposure, and temporal stability. The two character-sheet profiles deliberately use long moving-camera orbits and fixed extraction indices instead.
+The first five entries are Studio-style compact still-image profiles. Their prompt asks for a locked camera and an immediately completed result held unchanged, then the still decoder scores sharpness, contrast, exposure, and temporal stability. The directed profile assigns the temporal budget to exactly one transformation before scoring only the completed tail. The two character-sheet profiles deliberately use long moving-camera orbits and fixed extraction indices instead.
 
 This pack does not freeze temporal RoPE. The quality paths intentionally use H3's natural temporal coordinates so the model can evolve away from the edit anchor or form a new reference-driven image. In true-one-frame mode there is only one target temporal coordinate, so a RoPE freeze would be a no-op.
 
@@ -124,9 +139,11 @@ The included [mixed-reference still workflow](example_workflows/H3_Edit_Mixed_Re
 
 For a character sheet, load [H3_Character_Sheet_6_Panel.json](example_workflows/H3_Character_Sheet_6_Panel.json). Replace all three placeholder images and rewrite the per-picture assignment prompt before queueing. A 124-frame REF2VA pass is substantially slower and uses more memory than the still profiles.
 
+For re-posing, character replacement, or camera movement, load [H3_Directed_Transformations.json](example_workflows/H3_Directed_Transformations.json). Keep the strong-anchor role and directed-change quality profile selected, then choose one of the three `directed` prompt modes. The workflow note includes a short prompt for each mode.
+
 ## Prompt behavior
 
-`edit instruction` applies either a preservation contract or a new-image creation contract according to the primary-image switch, and explicitly scopes every `<Picture N>` as semantic or native. `use prompt verbatim` leaves the text unchanged; the Qwen picture blocks are still prepended in picture order.
+`edit instruction` applies either a preservation contract or a new-image creation contract according to the primary-image switch, and explicitly scopes every `<Picture N>` as semantic or native. The three `directed` modes compile short instructions into distinct timed re-pose, character-swap, or camera-angle contracts. `use prompt verbatim` leaves the text unchanged; the Qwen picture blocks are still prepended in picture order.
 
 Example instruction:
 
@@ -138,6 +155,14 @@ Example generation instruction:
 
 ```text
 Create a completely new nighttime street portrait of the woman from <Picture 1>, wearing the glasses from <Picture 2> and the jacket from <Picture 3>. Use a new pose, background, lighting design, and composition.
+```
+
+Example directed instructions:
+
+```text
+Re-pose: Use <Picture 2> only for the target body pose: left hand on hip and weight on the left leg.
+Character swap: Replace the woman with the woman from <Picture 2>, including her face, hair, physique, and wardrobe.
+New camera angle: Arc 45 degrees to camera right at the same height and focal length, keeping a medium shot.
 ```
 
 ## License and provenance

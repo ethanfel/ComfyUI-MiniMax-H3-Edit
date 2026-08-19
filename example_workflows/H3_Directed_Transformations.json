@@ -1,0 +1,344 @@
+{
+  "last_node_id": 16,
+  "last_link_id": 17,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "title": "FL2VA model · strong Picture 1 anchor",
+      "pos": [-1320, -410],
+      "size": [500, 82],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {"name": "unet_name", "type": "COMBO", "widget": {"name": "unet_name"}, "link": null},
+        {"name": "weight_dtype", "type": "COMBO", "widget": {"name": "weight_dtype"}, "link": null}
+      ],
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [1, 2]}],
+      "properties": {"Node name for S&R": "UNETLoader"},
+      "widgets_values": ["MiniMax-H3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "default"]
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "title": "H3 Qwen3-VL",
+      "pos": [-1320, -280],
+      "size": [500, 106],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {"name": "clip_name", "type": "COMBO", "widget": {"name": "clip_name"}, "link": null},
+        {"name": "type", "type": "COMBO", "widget": {"name": "type"}, "link": null},
+        {"name": "device", "shape": 7, "type": "COMBO", "widget": {"name": "device"}, "link": null}
+      ],
+      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [3]}],
+      "properties": {"Node name for S&R": "CLIPLoader"},
+      "widgets_values": ["MiniMax-H3/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "minimax", "default"]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "title": "H3 video VAE",
+      "pos": [-1320, -130],
+      "size": [500, 60],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [{"name": "vae_name", "type": "COMBO", "widget": {"name": "vae_name"}, "link": null}],
+      "outputs": [{"name": "VAE", "type": "VAE", "links": [4, 5]}],
+      "properties": {"Node name for S&R": "VAELoader"},
+      "widgets_values": ["MiniMax-H3/minimax_h3_video_vae_fp16.safetensors"]
+    },
+    {
+      "id": 4,
+      "type": "LoadImage",
+      "title": "Picture 1 · Source frame to preserve",
+      "pos": [-1320, 90],
+      "size": [420, 390],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "COMBO", "widget": {"name": "image"}, "link": null},
+        {"name": "upload", "type": "IMAGEUPLOAD", "widget": {"name": "upload"}, "link": null}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [6]},
+        {"name": "MASK", "type": "MASK", "links": null}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["source.png", "image"]
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "title": "Picture 2 · Pose / donor / angle guide",
+      "pos": [-850, 90],
+      "size": [420, 390],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "COMBO", "widget": {"name": "image"}, "link": null},
+        {"name": "upload", "type": "IMAGEUPLOAD", "widget": {"name": "upload"}, "link": null}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [7]},
+        {"name": "MASK", "type": "MASK", "links": null}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["directed_guide.png", "image"]
+    },
+    {
+      "id": 6,
+      "type": "AddH3EditReference",
+      "title": "Picture 2 · Semantic guide (changeable)",
+      "pos": [-850, 530],
+      "size": [420, 190],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "IMAGE", "link": 7},
+        {"name": "transport", "type": "COMBO", "widget": {"name": "transport"}, "link": null},
+        {"name": "semantic_resolution", "type": "INT", "widget": {"name": "semantic_resolution"}, "link": null},
+        {"name": "native_reference_size", "type": "COMBO", "widget": {"name": "native_reference_size"}, "link": null},
+        {"name": "previous_references", "shape": 7, "type": "H3EDIT_REFERENCE_STACK", "link": null}
+      ],
+      "outputs": [
+        {"name": "references", "type": "H3EDIT_REFERENCE_STACK", "links": [8]},
+        {"name": "info", "type": "STRING", "links": null}
+      ],
+      "properties": {"Node name for S&R": "AddH3EditReference"},
+      "widgets_values": ["semantic (Qwen only)", 1024, "match output area"]
+    },
+    {
+      "id": 7,
+      "type": "TextEncodeH3Edit",
+      "title": "Switch · re-pose / character swap / new angle",
+      "pos": [-320, 10],
+      "size": [720, 700],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {"name": "clip", "type": "CLIP", "link": 3},
+        {"name": "vae", "type": "VAE", "link": 4},
+        {"name": "source_image", "type": "IMAGE", "link": 6},
+        {"name": "prompt", "type": "STRING", "widget": {"name": "prompt"}, "link": null},
+        {"name": "primary_image_role", "type": "COMBO", "widget": {"name": "primary_image_role"}, "link": null},
+        {"name": "reference_mode", "type": "COMBO", "widget": {"name": "reference_mode"}, "link": null},
+        {"name": "width", "type": "INT", "widget": {"name": "width"}, "link": null},
+        {"name": "height", "type": "INT", "widget": {"name": "height"}, "link": null},
+        {"name": "source_fit", "type": "COMBO", "widget": {"name": "source_fit"}, "link": null},
+        {"name": "prompt_mode", "type": "COMBO", "widget": {"name": "prompt_mode"}, "link": null},
+        {"name": "semantic_resolution", "type": "INT", "widget": {"name": "semantic_resolution"}, "link": null},
+        {"name": "native_reference_size", "type": "COMBO", "widget": {"name": "native_reference_size"}, "link": null},
+        {"name": "reference_image", "shape": 7, "type": "IMAGE", "link": null},
+        {"name": "quality_profile", "type": "COMBO", "widget": {"name": "quality_profile"}, "link": null},
+        {"name": "reference_stack", "shape": 7, "type": "H3EDIT_REFERENCE_STACK", "link": 8}
+      ],
+      "outputs": [
+        {"name": "positive", "type": "CONDITIONING", "links": [9]},
+        {"name": "latent", "type": "LATENT", "links": [10]},
+        {"name": "fitted_source", "type": "IMAGE", "links": null},
+        {"name": "encoded_prompt", "type": "STRING", "links": null},
+        {"name": "info", "type": "STRING", "links": null}
+      ],
+      "properties": {"Node name for S&R": "TextEncodeH3Edit"},
+      "widgets_values": [
+        "Use <Picture 2> only for the target body pose: left hand on hip, right arm relaxed, weight on the left leg, shoulders turned slightly toward camera. Keep the identity, face, hairstyle, clothes, scene, lighting, lens, and framing from <Picture 1> unchanged.",
+        "edit | strong scene anchor (FL2VA)",
+        "none (source only)",
+        768,
+        1344,
+        "crop center",
+        "directed | re-pose character",
+        1024,
+        "match output area",
+        "directed change | 39-frame settle -> 1 image"
+      ]
+    },
+    {
+      "id": 8,
+      "type": "KSamplerSelect",
+      "pos": [520, -260],
+      "size": [370, 60],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [{"name": "sampler_name", "type": "COMBO", "widget": {"name": "sampler_name"}, "link": null}],
+      "outputs": [{"name": "SAMPLER", "type": "SAMPLER", "links": [11]}],
+      "properties": {"Node name for S&R": "KSamplerSelect"},
+      "widgets_values": ["euler"]
+    },
+    {
+      "id": 9,
+      "type": "BasicScheduler",
+      "pos": [520, -150],
+      "size": [370, 130],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 1},
+        {"name": "scheduler", "type": "COMBO", "widget": {"name": "scheduler"}, "link": null},
+        {"name": "steps", "type": "INT", "widget": {"name": "steps"}, "link": null},
+        {"name": "denoise", "type": "FLOAT", "widget": {"name": "denoise"}, "link": null}
+      ],
+      "outputs": [{"name": "SIGMAS", "type": "SIGMAS", "links": [12]}],
+      "properties": {"Node name for S&R": "BasicScheduler"},
+      "widgets_values": ["linear_quadratic", 25, 1.0]
+    },
+    {
+      "id": 10,
+      "type": "BasicGuider",
+      "pos": [520, 30],
+      "size": [370, 80],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 2},
+        {"name": "conditioning", "type": "CONDITIONING", "link": 9}
+      ],
+      "outputs": [{"name": "GUIDER", "type": "GUIDER", "links": [13]}],
+      "properties": {"Node name for S&R": "BasicGuider"},
+      "widgets_values": []
+    },
+    {
+      "id": 11,
+      "type": "RandomNoise",
+      "pos": [520, 160],
+      "size": [370, 82],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [{"name": "noise_seed", "type": "INT", "widget": {"name": "noise_seed"}, "link": null}],
+      "outputs": [{"name": "NOISE", "type": "NOISE", "links": [14]}],
+      "properties": {"Node name for S&R": "RandomNoise"},
+      "widgets_values": [42, "randomize"]
+    },
+    {
+      "id": 12,
+      "type": "SamplerCustomAdvanced",
+      "pos": [980, -40],
+      "size": [380, 180],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {"name": "noise", "type": "NOISE", "link": 14},
+        {"name": "guider", "type": "GUIDER", "link": 13},
+        {"name": "sampler", "type": "SAMPLER", "link": 11},
+        {"name": "sigmas", "type": "SIGMAS", "link": 12},
+        {"name": "latent_image", "type": "LATENT", "link": 10}
+      ],
+      "outputs": [
+        {"name": "output", "type": "LATENT", "links": [15]},
+        {"name": "denoised_output", "type": "LATENT", "links": null}
+      ],
+      "properties": {"Node name for S&R": "SamplerCustomAdvanced"},
+      "widgets_values": []
+    },
+    {
+      "id": 13,
+      "type": "DecodeH3SingleFrame",
+      "title": "Choose one image from settled tail",
+      "pos": [1450, -40],
+      "size": [400, 110],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 15},
+        {"name": "vae", "type": "VAE", "link": 5}
+      ],
+      "outputs": [
+        {"name": "image", "type": "IMAGE", "links": [16, 17]},
+        {"name": "info", "type": "STRING", "links": null}
+      ],
+      "properties": {"Node name for S&R": "DecodeH3SingleFrame"},
+      "widgets_values": []
+    },
+    {
+      "id": 14,
+      "type": "PreviewImage",
+      "title": "Directed result",
+      "pos": [1940, -220],
+      "size": [570, 520],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [{"name": "images", "type": "IMAGE", "link": 16}],
+      "outputs": [],
+      "properties": {"Node name for S&R": "PreviewImage"},
+      "widgets_values": []
+    },
+    {
+      "id": 15,
+      "type": "SaveImage",
+      "title": "Save directed result",
+      "pos": [1940, 360],
+      "size": [500, 100],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 17},
+        {"name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}, "link": null}
+      ],
+      "outputs": [],
+      "properties": {"Node name for S&R": "SaveImage"},
+      "widgets_values": ["H3Directed/%date:yyyy-MM-dd%/result"]
+    },
+    {
+      "id": 16,
+      "type": "MarkdownNote",
+      "title": "How to switch tasks · method credit",
+      "pos": [-1320, 810],
+      "size": [1720, 490],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "## Three directed transformations\n\nKeep **primary image role** on `edit | strong scene anchor (FL2VA)` and **quality profile** on `directed change | 39-frame settle -> 1 image`. The node expands your instruction into a timed H3 I2VA prompt, finishes the change by 65%, holds the result, and the decoder chooses only among tail frames 34–38.\n\n- **Re-pose:** select `directed | re-pose character`; Picture 2 should show only the desired pose. Example: `Use <Picture 2> only for the target body pose: right hand raised, weight on left leg. Keep everything else from <Picture 1>.`\n- **Character swap:** select `directed | character swap`; Picture 2 should show the donor character. Example: `Replace the woman with the woman from <Picture 2>, including face, hair, physique, and wardrobe.`\n- **New camera angle:** select `directed | new camera angle`. Picture 2 is optional; disconnect the reference stack for a text-only move. Example: `Arc 45 degrees to camera right at the same height and focal length, preserving a medium shot.`\n\nChain more **Add H3 Edit Reference** nodes when a task needs more guides. Semantic guides are the recommended FL2VA route. Native guides can be mixed with the Picture 1 keyframe, but that combination is experimental.\n\n## Credit and inspiration\n\nThe controlled-motion-and-settled-frame method is inspired by **C_Nugget's** ingenious continuous-camera character-sheet workflow. Its disciplined assignment of motion to one controlled variable is adapted here for re-posing, character replacement, and camera movement.\n\n### [Open C_Nugget's original H3 Character Sheet Generator](https://huggingface.co/PoopMan333/H3_Character_Sheet_Generator)"
+      ]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 9, 0, "MODEL"],
+    [2, 1, 0, 10, 0, "MODEL"],
+    [3, 2, 0, 7, 0, "CLIP"],
+    [4, 3, 0, 7, 1, "VAE"],
+    [5, 3, 0, 13, 1, "VAE"],
+    [6, 4, 0, 7, 2, "IMAGE"],
+    [7, 5, 0, 6, 0, "IMAGE"],
+    [8, 6, 0, 7, 14, "H3EDIT_REFERENCE_STACK"],
+    [9, 7, 0, 10, 1, "CONDITIONING"],
+    [10, 7, 1, 12, 4, "LATENT"],
+    [11, 8, 0, 12, 2, "SAMPLER"],
+    [12, 9, 0, 12, 3, "SIGMAS"],
+    [13, 10, 0, 12, 1, "GUIDER"],
+    [14, 11, 0, 12, 0, "NOISE"],
+    [15, 12, 0, 13, 0, "LATENT"],
+    [16, 13, 0, 14, 0, "IMAGE"],
+    [17, 13, 0, 15, 0, "IMAGE"]
+  ],
+  "groups": [
+    {"id": 1, "title": "1 · FL2VA, Qwen, and VAE", "bounding": [-1360, -450, 580, 420], "color": "#3f789e", "font_size": 22, "flags": {}},
+    {"id": 2, "title": "2 · Source anchor and optional semantic guide", "bounding": [-1360, 50, 980, 710], "color": "#496b8a", "font_size": 22, "flags": {}},
+    {"id": 3, "title": "3 · Select one directed task and write a short instruction", "bounding": [-360, -30, 800, 780], "color": "#8f6f40", "font_size": 22, "flags": {}},
+    {"id": 4, "title": "4 · Sample 39 frames and select from settled tail", "bounding": [480, -310, 1410, 820], "color": "#456744", "font_size": 22, "flags": {}},
+    {"id": 5, "title": "5 · Preview and save one image", "bounding": [1900, -260, 650, 780], "color": "#6f4c7a", "font_size": 22, "flags": {}},
+    {"id": 6, "title": "Instructions and C_Nugget credit", "bounding": [-1360, 770, 1800, 570], "color": "#7a5b32", "font_size": 22, "flags": {}}
+  ],
+  "config": {},
+  "extra": {"ds": {"scale": 0.62, "offset": [760, 390]}},
+  "version": 0.4
+}

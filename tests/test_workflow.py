@@ -5,6 +5,7 @@ from pathlib import Path
 
 WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Edit_Mixed_References.json"
 CHARACTER_WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Character_Sheet_6_Panel.json"
+DIRECTED_WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Directed_Transformations.json"
 
 
 def _load_validated_workflow(path: Path):
@@ -82,3 +83,31 @@ def test_character_sheet_workflow_uses_ref2va_orbit_and_pack_decoder():
     assert credit["type"] == "MarkdownNote"
     assert "C_Nugget" in credit["widgets_values"][0]
     assert "https://huggingface.co/PoopMan333/H3_Character_Sheet_Generator" in credit["widgets_values"][0]
+
+
+def test_directed_workflow_switches_three_tasks_and_selects_settled_tail():
+    _graph, nodes = _load_validated_workflow(DIRECTED_WORKFLOW)
+
+    assert len(nodes) == 16
+    assert "fl2va" in nodes[1]["widgets_values"][0]
+    assert nodes[6]["type"] == "AddH3EditReference"
+    assert nodes[7]["type"] == "TextEncodeH3Edit"
+    assert nodes[13]["type"] == "DecodeH3SingleFrame"
+
+    encoder = nodes[7]
+    assert encoder["widgets_values"][1] == "edit | strong scene anchor (FL2VA)"
+    assert encoder["widgets_values"][6] == "directed | re-pose character"
+    assert encoder["widgets_values"][9] == "directed change | 39-frame settle -> 1 image"
+    assert encoder["inputs"][14]["link"] is not None
+    assert "<Picture 2>" in encoder["widgets_values"][0]
+    assert nodes[6]["widgets_values"][0] == "semantic (Qwen only)"
+    assert nodes[8]["widgets_values"] == ["euler"]
+    assert nodes[9]["widgets_values"] == ["linear_quadratic", 25, 1.0]
+
+    instructions = nodes[16]["widgets_values"][0]
+    assert "directed | re-pose character" in instructions
+    assert "directed | character swap" in instructions
+    assert "directed | new camera angle" in instructions
+    assert "tail frames 34–38" in instructions
+    assert "C_Nugget" in instructions
+    assert "https://huggingface.co/PoopMan333/H3_Character_Sheet_Generator" in instructions
