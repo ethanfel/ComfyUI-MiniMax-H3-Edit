@@ -145,6 +145,14 @@ For re-posing, character replacement, or camera movement, load [H3_Directed_Tran
 
 `edit instruction` applies either a preservation contract or a new-image creation contract according to the primary-image switch, and explicitly scopes every `<Picture N>` as semantic or native. The three `directed` modes compile short instructions into distinct timed re-pose, character-swap, or camera-angle contracts. `use prompt verbatim` leaves the text unchanged; the Qwen picture blocks are still prepended in picture order.
 
+For a larger task-aware editor, connect the `text` output from
+[H3 Prompt IDE](https://github.com/ethanfel/ComfyUI-H3-Prompt-IDE) directly to
+this node's `prompt` input. Prompt IDE 0.7.0 and later detects the selected edit,
+re-pose, character-swap, new-angle, or character-sheet task and displays its
+matching instruction category. It does not rewrite the text; this encoder still
+owns the full H3 task and timing wrapper. With `use prompt verbatim`, Prompt IDE
+keeps its manually selected full H3 schema instead.
+
 Example instruction:
 
 ```text
