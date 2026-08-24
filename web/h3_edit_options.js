@@ -54,12 +54,15 @@ function optionsConnected(node) {
 }
 
 function refreshEncoder(node) {
-    const compact = optionsConnected(node);
+    const configured = optionsConnected(node);
     node._h3EditOriginalTitle ??= node.title;
     for (const item of node.widgets ?? []) {
-        if (LEGACY_OPTION_WIDGETS.has(item.name)) setWidgetVisible(item, !compact);
+        // These inputs stay in the backend schema so old workflows continue to
+        // deserialize, but they are implementation details now. New workflows
+        // configure them through H3 Edit Options instead of the encoder.
+        if (LEGACY_OPTION_WIDGETS.has(item.name)) setWidgetVisible(item, false);
     }
-    node.title = compact ? `${node._h3EditOriginalTitle} · Options` : node._h3EditOriginalTitle;
+    node.title = configured ? `${node._h3EditOriginalTitle} · Options` : node._h3EditOriginalTitle;
     resize(node);
 }
 

@@ -1,6 +1,6 @@
 # ComfyUI MiniMax H3 Edit
 
-A deliberately small ComfyUI node pack for **single-image MiniMax H3 generation and photo editing**. It has no Director, hidden state, prompt analyzer, model loader, or sampler wrapper. Its small frontend only collapses advanced settings when the Options node is connected.
+A deliberately small ComfyUI node pack for **single-image MiniMax H3 generation and photo editing**. It has no Director, hidden state, prompt analyzer, model loader, or sampler wrapper. Its small frontend keeps task-specific settings off the main encoder and exposes them through the Options node.
 
 The pack adds six nodes:
 
@@ -15,7 +15,7 @@ The still path produces exactly one image. By default, it samples the same short
 
 ## One mode, canonical settings
 
-Connect **H3 Edit Options** to the encoder's `options` input. The encoder's legacy task-specific widgets collapse, and normal operation requires one choice: `mode`. Every mode sends a complete compatible preset:
+The main encoder is always compact. Its old task-specific inputs remain in the backend only so saved workflows still load; they are no longer displayed as editable widgets. Connect **H3 Edit Options** to the encoder's `options` input and normal operation requires one choice: `mode`. Every mode sends a complete compatible preset:
 
 | Mode | Canonical settings |
 |---|---|
