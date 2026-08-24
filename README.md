@@ -1,16 +1,33 @@
 # ComfyUI MiniMax H3 Edit
 
-A deliberately small ComfyUI node pack for **single-image MiniMax H3 generation and photo editing**. It has no Director, hidden state, prompt analyzer, model loader, sampler wrapper, or custom frontend.
+A deliberately small ComfyUI node pack for **single-image MiniMax H3 generation and photo editing**. It has no Director, hidden state, prompt analyzer, model loader, or sampler wrapper. Its small frontend only collapses advanced settings when the Options node is connected.
 
-The pack adds five nodes:
+The pack adds six nodes:
 
 - **Add H3 Edit Reference** — builds an ordered, chainable reference stack; every image independently chooses semantic or native transport.
+- **H3 Edit Options** — selects one canonical task preset; expert overrides remain collapsed until explicitly enabled.
 - **Text Encode H3 Edit / Generate** — switches between a strong source-photo edit and reference-driven generation, then builds H3 conditioning from optional ordered guides.
 - **Decode H3 Edit to One Image** — decodes the packet, scores its candidates, and returns one stable high-quality frame.
 - **Decode H3 Character Sheet** — extracts calibrated views from a 73/124-frame character orbit and stitches a 2x2 or 3x2 sheet.
 - **Decode H3 Scene Coverage** — scores every timed camera hold and returns 2–24 consistent viewpoints, a contact sheet, and the complete camera path.
 
 The still path produces exactly one image. By default, it samples the same short 5-frame context used by H3 Studio because H3 is a video model and a literal one-token latent leaves no temporal context around the result. Character-sheet profiles instead produce one stitched sheet plus optional selected/all-frame batches. The old true-one-frame path remains available as an explicitly experimental, low-quality option.
+
+## One mode, canonical settings
+
+Connect **H3 Edit Options** to the encoder's `options` input. The encoder's legacy task-specific widgets collapse, and normal operation requires one choice: `mode`. Every mode sends a complete compatible preset:
+
+| Mode | Canonical settings |
+|---|---|
+| `still \| edit or generate` | recommended 5-frame still context |
+| `directed \| re-pose character` | re-pose compiler + 39-frame settled change |
+| `directed \| character swap` | swap compiler + 39-frame settled change |
+| `directed \| new camera angle` | camera compiler + 39-frame settled change |
+| `character sheet \| canonical 6 views` | six-view compiler + 124-frame orbit |
+| `scene coverage \| canonical camera path` | frozen-scene compiler + 124 frames + 12 views + 360° clockwise arc + five-frame holds + loop closure |
+| `advanced \| prompt verbatim` | unchanged prompt + recommended 5-frame context |
+
+Leave `show_overrides` disabled and hidden stale values are ignored—the canonical preset is authoritative. Enable it only when deliberately changing a compatible frame profile, reference transport/size, source fit, or scene-coverage geometry. An incompatible profile override produces a clear validation error rather than silently building a contradictory task.
 
 ## Primary image role switch
 
@@ -88,7 +105,7 @@ The included [directed-transformations workflow](example_workflows/H3_Directed_T
 
 ## Frozen scene coverage
 
-`directed | frozen scene coverage` generalizes the character-sheet camera method from one isolated character to a complete rigid room or scene. Select one of the 124-, 243-, or 362-frame scene-coverage profiles, choose 2–24 output views, set the camera arc and direction, and decode with **Decode H3 Scene Coverage**. The compiler writes exact timed camera waypoints and static capture windows; the decoder scores every window independently and returns its best stable frame.
+`scene coverage | canonical camera path` generalizes the character-sheet camera method from one isolated character to a complete rigid room or scene. Selecting this one mode supplies a complete 124-frame, 12-view, 360° clockwise preset. Enable overrides only when a 243/362-frame path, different view count, partial arc, opposite direction, different hold, or disabled loop closure is intentional. Decode with **Decode H3 Scene Coverage**. The compiler writes exact timed camera waypoints and static capture windows; the decoder scores every window independently and returns its best stable frame.
 
 There are two scene origins:
 
@@ -157,10 +174,11 @@ Restart ComfyUI. The nodes appear under `MiniMax H3/Edit`.
 1. Load the H3 diffusion model, Qwen text encoder, and video VAE with standard ComfyUI loaders.
 2. Connect the photo being edited or the first generation reference to `source_image` on **Text Encode H3 Edit / Generate**.
 3. Select its role: strong edit anchor, semantic generation reference, or native generation reference.
-4. For one additional guide, use its direct `reference_image` socket. For multiple guides, chain **Add H3 Edit Reference** nodes into `reference_stack`.
-5. Declare semantic or native transport for each guide and refer to it with its ordered `<Picture N>` tag.
-6. Use `ModelSamplingMiniMaxH3`, `BasicGuider`, `RandomNoise`, a sampler and scheduler, and `SamplerCustomAdvanced` as in the normal native H3 graph.
-7. Connect the sampled latent to **Decode H3 Edit to One Image**, then preview or save its image output.
+4. Connect **H3 Edit Options** and select one `mode`. Leave overrides closed for its canonical settings.
+5. For one additional guide, use the direct `reference_image` socket. For multiple guides, chain **Add H3 Edit Reference** nodes into `reference_stack`.
+6. Declare semantic or native transport for each stacked guide and refer to it with its ordered `<Picture N>` tag.
+7. Use `ModelSamplingMiniMaxH3`, `BasicGuider`, `RandomNoise`, a sampler and scheduler, and `SamplerCustomAdvanced` as in the normal native H3 graph.
+8. Decode with the output node matching the selected task: one image, character sheet, or scene coverage.
 
 The included [mixed-reference still workflow](example_workflows/H3_Edit_Mixed_References.json) defaults to a single-image FL2VA edit using the recommended hidden 5-frame context. Its encoder exposes the role switch directly. It uses semantic glasses as `<Picture 2>` and a native wardrobe/material guide as `<Picture 3>`. Replace its model filenames and input images with files available in your ComfyUI installation; select the REF2VA model before using a native Picture 1 generation role.
 
@@ -174,10 +192,10 @@ For re-posing, character replacement, or camera movement, load [H3_Directed_Tran
 
 For a larger task-aware editor, connect the `text` output from
 [H3 Prompt IDE](https://github.com/ethanfel/ComfyUI-H3-Prompt-IDE) directly to
-this node's `prompt` input. Prompt IDE 0.8.0 and later detects the selected edit,
+this node's `prompt` input. Prompt IDE 0.8.2 and later reads the connected Options mode and detects the selected edit,
 re-pose, character-swap, new-angle, character-sheet, or frozen-scene task and displays its
-matching instruction category. It does not rewrite the text; this encoder still
-owns the full H3 task and timing wrapper. With `use prompt verbatim`, Prompt IDE
+matching short instruction template. This encoder still owns the full H3 task
+and timing wrapper. With the verbatim mode, Prompt IDE
 keeps its manually selected full H3 schema instead.
 
 Example instruction:

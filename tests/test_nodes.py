@@ -10,6 +10,10 @@ from h3edit.nodes import (
     CHARACTER_SHEET_AUTO,
     CHARACTER_SHEET_SIX,
     NATIVE_SIZE_MATCH,
+    OPTION_MODE_CHARACTER_SHEET,
+    OPTION_MODE_REPOSE,
+    OPTION_MODE_SCENE_COVERAGE,
+    OPTION_PROFILE_CANONICAL,
     PRIMARY_EDIT_ANCHOR,
     PRIMARY_NATIVE_REFERENCE,
     PRIMARY_SEMANTIC_REFERENCE,
@@ -18,6 +22,7 @@ from h3edit.nodes import (
     PROMPT_NEW_ANGLE,
     PROMPT_REPOSE,
     PROMPT_SCENE_COVERAGE,
+    PROMPT_VERBATIM,
     QUALITY_CHARACTER_FOUR,
     QUALITY_CHARACTER_SIX,
     QUALITY_DIRECTED_CHANGE,
@@ -34,6 +39,7 @@ from h3edit.nodes import (
     DecodeH3CharacterSheet,
     DecodeH3SceneCoverage,
     DecodeH3SingleFrame,
+    H3EditOptions,
     TextEncodeH3Edit,
     _scene_capture_plan,
     semantic_target_size,
@@ -119,6 +125,7 @@ def _encode(
     coverage_direction="clockwise / camera right",
     coverage_hold_frames=5,
     coverage_loop_closure=True,
+    options=None,
 ):
     clip = FakeClip()
     vae = FakeVAE()
@@ -143,8 +150,81 @@ def _encode(
         coverage_direction=coverage_direction,
         coverage_hold_frames=coverage_hold_frames,
         coverage_loop_closure=coverage_loop_closure,
+        options=options,
     )
     return clip, vae, output
+
+
+def _options(mode, *, show_overrides=False, profile_override=OPTION_PROFILE_CANONICAL, **overrides):
+    values = {
+        "direct_reference_transport": REFERENCE_NATIVE,
+        "source_fit": "stretch",
+        "semantic_resolution": 2048,
+        "native_reference_size": NATIVE_SIZE_MATCH,
+        "coverage_views": 7,
+        "coverage_arc_degrees": 180.0,
+        "coverage_direction": "clockwise / camera right",
+        "coverage_hold_frames": 3,
+        "coverage_loop_closure": False,
+        **overrides,
+    }
+    return H3EditOptions().build(
+        mode=mode,
+        show_overrides=show_overrides,
+        profile_override=profile_override,
+        **values,
+    )[0]
+
+
+def test_options_mode_sends_canonical_scene_settings_without_manual_coordination():
+    options = _options(OPTION_MODE_SCENE_COVERAGE)
+
+    assert options["prompt_mode"] == PROMPT_SCENE_COVERAGE
+    assert options["quality_profile"] == QUALITY_SCENE_SHORT
+    assert options["reference_mode"] == REFERENCE_SEMANTIC
+    assert options["source_fit"] == "crop center"
+    assert options["semantic_resolution"] == 1024
+    assert options["coverage_views"] == 12
+    assert options["coverage_arc_degrees"] == 360.0
+    assert options["coverage_hold_frames"] == 5
+    assert options["coverage_loop_closure"] is True
+
+
+def test_options_allow_deliberate_compatible_overrides():
+    options = _options(
+        OPTION_MODE_SCENE_COVERAGE,
+        show_overrides=True,
+        profile_override=QUALITY_SCENE_MEDIUM,
+        coverage_views=8,
+        coverage_arc_degrees=240.0,
+    )
+
+    assert options["quality_profile"] == QUALITY_SCENE_MEDIUM
+    assert options["coverage_views"] == 8
+    assert options["coverage_arc_degrees"] == 240.0
+    with pytest.raises(ValueError, match="cannot use profile override"):
+        _options(
+            OPTION_MODE_REPOSE,
+            show_overrides=True,
+            profile_override=QUALITY_SCENE_MEDIUM,
+        )
+
+
+def test_connected_options_override_every_legacy_task_widget():
+    options = _options(OPTION_MODE_CHARACTER_SHEET)
+    _clip, _vae, (_conditioning, latent, _fitted, prompt, info) = _encode(
+        REFERENCE_NONE,
+        quality_profile=QUALITY_EXPERIMENTAL,
+        prompt_mode=PROMPT_VERBATIM,
+        primary_image_role=PRIMARY_SEMANTIC_REFERENCE,
+        options=options,
+        prompt="Use Picture 1 for identity.",
+    )
+
+    assert latent["h3edit_requested_frames"] == 124
+    assert latent["h3edit_option_mode"] == OPTION_MODE_CHARACTER_SHEET
+    assert prompt.startswith("subject_definitions:")
+    assert OPTION_MODE_CHARACTER_SHEET in info
 
 
 def test_semantic_target_size_preserves_ratio_and_area_budget():

@@ -63,6 +63,7 @@ REFERENCE_NATIVE = "native (Qwen + VAE ref)"
 REFERENCE_MODES = [REFERENCE_SEMANTIC, REFERENCE_NATIVE, REFERENCE_NONE]
 REFERENCE_TRANSPORTS = [REFERENCE_SEMANTIC, REFERENCE_NATIVE]
 REFERENCE_STACK_TYPE = "H3EDIT_REFERENCE_STACK"
+EDIT_OPTIONS_TYPE = "H3EDIT_OPTIONS"
 
 PRIMARY_EDIT_ANCHOR = "edit | strong scene anchor (FL2VA)"
 PRIMARY_SEMANTIC_REFERENCE = "generate | semantic Picture 1 (FL2VA)"
@@ -77,6 +78,31 @@ PROMPT_SCENE_COVERAGE = "directed | frozen scene coverage"
 PROMPT_VERBATIM = "use prompt verbatim"
 DIRECTED_PROMPT_MODES = [PROMPT_REPOSE, PROMPT_CHARACTER_SWAP, PROMPT_NEW_ANGLE]
 PROMPT_MODES = [PROMPT_EDIT, *DIRECTED_PROMPT_MODES, PROMPT_SCENE_COVERAGE, PROMPT_VERBATIM]
+
+OPTION_MODE_STILL = "still | edit or generate"
+OPTION_MODE_REPOSE = "directed | re-pose character"
+OPTION_MODE_CHARACTER_SWAP = "directed | character swap"
+OPTION_MODE_NEW_ANGLE = "directed | new camera angle"
+OPTION_MODE_CHARACTER_SHEET = "character sheet | canonical 6 views"
+OPTION_MODE_SCENE_COVERAGE = "scene coverage | canonical camera path"
+OPTION_MODE_VERBATIM = "advanced | prompt verbatim"
+OPTION_PROFILE_CANONICAL = "canonical for selected mode"
+EDIT_OPTION_PRESETS = {
+    OPTION_MODE_STILL: (PROMPT_EDIT, None),
+    OPTION_MODE_REPOSE: (PROMPT_REPOSE, QUALITY_DIRECTED_CHANGE),
+    OPTION_MODE_CHARACTER_SWAP: (PROMPT_CHARACTER_SWAP, QUALITY_DIRECTED_CHANGE),
+    OPTION_MODE_NEW_ANGLE: (PROMPT_NEW_ANGLE, QUALITY_DIRECTED_CHANGE),
+    OPTION_MODE_CHARACTER_SHEET: (PROMPT_EDIT, QUALITY_CHARACTER_SIX),
+    OPTION_MODE_SCENE_COVERAGE: (PROMPT_SCENE_COVERAGE, QUALITY_SCENE_SHORT),
+    OPTION_MODE_VERBATIM: (PROMPT_VERBATIM, None),
+}
+STILL_QUALITY_PROFILES = [
+    QUALITY_RECOMMENDED,
+    QUALITY_EXTENDED,
+    QUALITY_HIGH,
+    QUALITY_MAXIMUM,
+    QUALITY_EXPERIMENTAL,
+]
 
 SCENE_DIRECTION_CLOCKWISE = "clockwise / camera right"
 SCENE_DIRECTION_COUNTERCLOCKWISE = "counterclockwise / camera left"
@@ -851,6 +877,189 @@ class AddH3EditReference:
         )
 
 
+class H3EditOptions:
+    """Keep task-specific controls off the main H3 Edit encoder."""
+
+    DESCRIPTION = (
+        "One mode selects a compatible H3 prompt compiler and frame profile together. Connect this node to Text Encode "
+        "H3 Edit / Generate to hide the encoder's legacy advanced widgets. Leave Show Overrides off to send the full "
+        "canonical preset; coverage controls appear only when overrides are enabled for scene coverage."
+    )
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "mode": (
+                    list(EDIT_OPTION_PRESETS),
+                    {
+                        "default": OPTION_MODE_STILL,
+                        "tooltip": (
+                            "The complete task preset. Scene coverage, directed edits, and character sheets each "
+                            "select their required frame profile automatically."
+                        ),
+                    },
+                ),
+                "show_overrides": (
+                    "BOOLEAN",
+                    {
+                        "default": False,
+                        "tooltip": "Reveal expert overrides. Leave off to use the complete canonical preset.",
+                    },
+                ),
+                "profile_override": (
+                    [OPTION_PROFILE_CANONICAL, *QUALITY_PROFILES],
+                    {
+                        "default": OPTION_PROFILE_CANONICAL,
+                        "tooltip": "Override the canonical frame profile only when a task needs deliberate tuning.",
+                    },
+                ),
+                "direct_reference_transport": (
+                    REFERENCE_MODES,
+                    {
+                        "default": REFERENCE_SEMANTIC,
+                        "tooltip": "Transport for the optional direct reference_image on the encoder.",
+                    },
+                ),
+                "source_fit": (
+                    SOURCE_FIT_MODES,
+                    {
+                        "default": "crop center",
+                        "tooltip": "How an anchored Picture 1 is fitted to the output canvas.",
+                    },
+                ),
+                "semantic_resolution": (
+                    "INT",
+                    {
+                        "default": 1024,
+                        "min": 256,
+                        "max": MAX_SEMANTIC_RESOLUTION,
+                        "step": 32,
+                        "tooltip": "Equivalent-square Qwen pixel budget for semantic references.",
+                    },
+                ),
+                "native_reference_size": (
+                    NATIVE_SIZE_MODES,
+                    {
+                        "default": NATIVE_SIZE_MATCH,
+                        "tooltip": "Resize policy for native Qwen+VAE references.",
+                    },
+                ),
+                "coverage_views": (
+                    "INT",
+                    {
+                        "default": 12,
+                        "min": 2,
+                        "max": 24,
+                        "step": 1,
+                        "tooltip": "Scene-coverage output viewpoints. Ignored by every other mode.",
+                    },
+                ),
+                "coverage_arc_degrees": (
+                    "FLOAT",
+                    {
+                        "default": 360.0,
+                        "min": 15.0,
+                        "max": 360.0,
+                        "step": 15.0,
+                        "tooltip": "Scene-coverage camera arc. Ignored by every other mode.",
+                    },
+                ),
+                "coverage_direction": (
+                    SCENE_DIRECTIONS,
+                    {
+                        "default": SCENE_DIRECTION_CLOCKWISE,
+                        "tooltip": "Scene-coverage camera direction. Ignored by every other mode.",
+                    },
+                ),
+                "coverage_hold_frames": (
+                    "INT",
+                    {
+                        "default": 5,
+                        "min": 1,
+                        "max": 9,
+                        "step": 2,
+                        "tooltip": "Static frames around each coverage capture. Ignored by every other mode.",
+                    },
+                ),
+                "coverage_loop_closure": (
+                    "BOOLEAN",
+                    {
+                        "default": True,
+                        "tooltip": "Reuse an anchored source for 360-degree loop closure when possible.",
+                    },
+                ),
+            }
+        }
+
+    RETURN_TYPES = (EDIT_OPTIONS_TYPE,)
+    RETURN_NAMES = ("options",)
+    FUNCTION = "build"
+    CATEGORY = CATEGORY
+
+    def build(
+        self,
+        mode: str,
+        show_overrides: bool,
+        profile_override: str,
+        direct_reference_transport: str,
+        source_fit: str,
+        semantic_resolution: int,
+        native_reference_size: str,
+        coverage_views: int,
+        coverage_arc_degrees: float,
+        coverage_direction: str,
+        coverage_hold_frames: int,
+        coverage_loop_closure: bool,
+    ):
+        if mode not in EDIT_OPTION_PRESETS:
+            raise ValueError(f"Unknown H3 Edit option mode: {mode}")
+        prompt_mode, fixed_quality = EDIT_OPTION_PRESETS[mode]
+        canonical_quality = fixed_quality or QUALITY_RECOMMENDED
+        quality_profile = canonical_quality
+        overrides_enabled = bool(show_overrides)
+        if overrides_enabled and profile_override != OPTION_PROFILE_CANONICAL:
+            compatible_profiles = {
+                OPTION_MODE_STILL: set(STILL_QUALITY_PROFILES),
+                OPTION_MODE_VERBATIM: set(STILL_QUALITY_PROFILES),
+                OPTION_MODE_CHARACTER_SHEET: {QUALITY_CHARACTER_FOUR, QUALITY_CHARACTER_SIX},
+                OPTION_MODE_SCENE_COVERAGE: set(SCENE_COVERAGE_PROFILES),
+            }.get(mode, {QUALITY_DIRECTED_CHANGE})
+            if profile_override not in compatible_profiles:
+                raise ValueError(
+                    f"{mode} cannot use profile override {profile_override!r}; use its canonical profile or a "
+                    "compatible override."
+                )
+            quality_profile = profile_override
+        if not overrides_enabled:
+            direct_reference_transport = REFERENCE_SEMANTIC
+            source_fit = "crop center"
+            semantic_resolution = 1024
+            native_reference_size = NATIVE_SIZE_MATCH
+            coverage_views = 12
+            coverage_arc_degrees = 360.0
+            coverage_direction = SCENE_DIRECTION_CLOCKWISE
+            coverage_hold_frames = 5
+            coverage_loop_closure = True
+        return (
+            {
+                "mode": mode,
+                "show_overrides": overrides_enabled,
+                "prompt_mode": prompt_mode,
+                "quality_profile": quality_profile,
+                "reference_mode": direct_reference_transport,
+                "source_fit": source_fit,
+                "semantic_resolution": int(semantic_resolution),
+                "native_reference_size": native_reference_size,
+                "coverage_views": int(coverage_views),
+                "coverage_arc_degrees": float(coverage_arc_degrees),
+                "coverage_direction": coverage_direction,
+                "coverage_hold_frames": int(coverage_hold_frames),
+                "coverage_loop_closure": bool(coverage_loop_closure),
+            },
+        )
+
+
 class TextEncodeH3Edit:
     """Prepare a source-anchored edit or reference-driven still generation."""
 
@@ -1024,6 +1233,15 @@ class TextEncodeH3Edit:
                         ),
                     },
                 ),
+                "options": (
+                    EDIT_OPTIONS_TYPE,
+                    {
+                        "tooltip": (
+                            "Recommended: connect H3 Edit Options to choose one coherent task preset and hide all "
+                            "legacy task-specific widgets on this encoder."
+                        )
+                    },
+                ),
             },
         }
 
@@ -1061,8 +1279,28 @@ class TextEncodeH3Edit:
         coverage_direction: str = SCENE_DIRECTION_CLOCKWISE,
         coverage_hold_frames: int = 5,
         coverage_loop_closure: bool = True,
+        options: dict[str, Any] | None = None,
     ):
         import node_helpers
+
+        option_mode = None
+        if options is not None:
+            if not isinstance(options, dict):
+                raise ValueError("H3 Edit options must come from an H3 Edit Options node.")
+            option_mode = str(options.get("mode", ""))
+            if option_mode not in EDIT_OPTION_PRESETS:
+                raise ValueError(f"Unknown H3 Edit option mode: {option_mode}")
+            prompt_mode = str(options.get("prompt_mode", prompt_mode))
+            quality_profile = str(options.get("quality_profile", quality_profile))
+            reference_mode = str(options.get("reference_mode", reference_mode))
+            source_fit = str(options.get("source_fit", source_fit))
+            semantic_resolution = int(options.get("semantic_resolution", semantic_resolution))
+            native_reference_size = str(options.get("native_reference_size", native_reference_size))
+            coverage_views = int(options.get("coverage_views", coverage_views))
+            coverage_arc_degrees = float(options.get("coverage_arc_degrees", coverage_arc_degrees))
+            coverage_direction = str(options.get("coverage_direction", coverage_direction))
+            coverage_hold_frames = int(options.get("coverage_hold_frames", coverage_hold_frames))
+            coverage_loop_closure = bool(options.get("coverage_loop_closure", coverage_loop_closure))
 
         if reference_mode not in REFERENCE_MODES:
             raise ValueError(f"Unknown reference_mode: {reference_mode}")
@@ -1234,6 +1472,8 @@ class TextEncodeH3Edit:
 
         requested_frames = QUALITY_PROFILES[quality_profile]
         latent, natural_frames = _empty_h3_edit_latent(width, height, requested_frames)
+        if option_mode:
+            latent["h3edit_option_mode"] = option_mode
         scene_capture_plan = None
         if scene_task:
             scene_capture_plan = _scene_capture_plan(
@@ -1299,7 +1539,8 @@ class TextEncodeH3Edit:
         else:
             decoder_note = "Decode H3 Edit to One Image scores the decoded context and returns one stable high-quality still."
         info = (
-            f"{mode_note} | {quality_profile} | requested context {requested_frames} frames | "
+            f"{mode_note} | {option_mode + ' | ' if option_mode else ''}{quality_profile} | "
+            f"requested context {requested_frames} frames | "
             f"natural packet {natural_frames} frames | "
             f"output {width}x{height} | {reference_note}{ignored_note} "
             f"{decoder_note}"
@@ -1617,6 +1858,7 @@ class DecodeH3SceneCoverage:
 
 NODE_CLASS_MAPPINGS = {
     "AddH3EditReference": AddH3EditReference,
+    "H3EditOptions": H3EditOptions,
     "TextEncodeH3Edit": TextEncodeH3Edit,
     "DecodeH3SingleFrame": DecodeH3SingleFrame,
     "DecodeH3CharacterSheet": DecodeH3CharacterSheet,
@@ -1625,6 +1867,7 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "AddH3EditReference": "Add H3 Edit Reference",
+    "H3EditOptions": "H3 Edit Options",
     "TextEncodeH3Edit": "Text Encode H3 Edit / Generate",
     "DecodeH3SingleFrame": "Decode H3 Edit to One Image",
     "DecodeH3CharacterSheet": "Decode H3 Character Sheet",
