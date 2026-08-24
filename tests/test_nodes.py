@@ -17,19 +17,25 @@ from h3edit.nodes import (
     PROMPT_EDIT,
     PROMPT_NEW_ANGLE,
     PROMPT_REPOSE,
+    PROMPT_SCENE_COVERAGE,
     QUALITY_CHARACTER_FOUR,
     QUALITY_CHARACTER_SIX,
     QUALITY_DIRECTED_CHANGE,
     QUALITY_EXPERIMENTAL,
     QUALITY_MAXIMUM,
     QUALITY_RECOMMENDED,
+    QUALITY_SCENE_LONG,
+    QUALITY_SCENE_MEDIUM,
+    QUALITY_SCENE_SHORT,
     REFERENCE_NATIVE,
     REFERENCE_NONE,
     REFERENCE_SEMANTIC,
     AddH3EditReference,
     DecodeH3CharacterSheet,
+    DecodeH3SceneCoverage,
     DecodeH3SingleFrame,
     TextEncodeH3Edit,
+    _scene_capture_plan,
     semantic_target_size,
 )
 
@@ -108,6 +114,11 @@ def _encode(
     primary_image_role=PRIMARY_EDIT_ANCHOR,
     prompt_mode=PROMPT_EDIT,
     prompt="Add the glasses from Picture 2.",
+    coverage_views=12,
+    coverage_arc_degrees=360.0,
+    coverage_direction="clockwise / camera right",
+    coverage_hold_frames=5,
+    coverage_loop_closure=True,
 ):
     clip = FakeClip()
     vae = FakeVAE()
@@ -127,6 +138,11 @@ def _encode(
         reference_image=reference_image,
         quality_profile=quality_profile,
         reference_stack=reference_stack,
+        coverage_views=coverage_views,
+        coverage_arc_degrees=coverage_arc_degrees,
+        coverage_direction=coverage_direction,
+        coverage_hold_frames=coverage_hold_frames,
+        coverage_loop_closure=coverage_loop_closure,
     )
     return clip, vae, output
 
@@ -367,6 +383,127 @@ def test_directed_new_camera_angle_can_run_without_an_extra_guide():
     assert "subject and world remain rigidly frozen" in prompt
     assert "Reconstruct newly visible surfaces consistently" in prompt
     assert PROMPT_NEW_ANGLE in info
+
+
+def test_scene_capture_plan_scales_beyond_six_views_in_trained_frame_range():
+    short = _scene_capture_plan(124, 8, 180.0, 5)
+    medium = _scene_capture_plan(243, 12, 360.0, 5)
+    long = _scene_capture_plan(362, 16, 360.0, 7)
+
+    assert short["centers"] == (0, 18, 35, 53, 70, 88, 105, 123)
+    assert short["angles"] == pytest.approx((0, 180 / 7, 360 / 7, 540 / 7, 720 / 7, 900 / 7, 1080 / 7, 180))
+    assert len(medium["centers"]) == 12
+    assert medium["centers"][-1] < 242
+    assert len(long["centers"]) == 16
+    assert long["hold_frames"] == 7
+
+
+def test_frozen_scene_coverage_works_from_one_anchored_room():
+    clip, vae, (conditioning, latent, _fitted, prompt, info) = _encode(
+        REFERENCE_NONE,
+        quality_profile=QUALITY_SCENE_SHORT,
+        prompt_mode=PROMPT_SCENE_COVERAGE,
+        prompt="Orbit around the geometric center of the room while keeping the seated woman and all furniture frozen.",
+        coverage_views=8,
+        coverage_arc_degrees=180.0,
+        coverage_hold_frames=5,
+        coverage_loop_closure=True,
+    )
+
+    assert len(clip.tokenize_calls[0][1]["minimax_ref_items"]) == 1
+    assert len(vae.encoded) == 1
+    assert len(conditioning[0][1]["minimax_keyframes"]) == 1
+    assert prompt.startswith(
+        "For the target video, at 0.00 seconds into the target video, "
+        "<Picture 1> (from [Shot 1]) is fully referenced."
+    )
+    assert "No alternate-angle reference is supplied" in prompt
+    assert "Infer only genuinely occluded surfaces" in prompt
+    assert "Treat the complete scene as a rigid, frozen three-dimensional set" in prompt
+    assert "Exact waypoint schedule" in prompt
+    assert latent["h3edit_scene_capture_centers"] == (0, 18, 35, 53, 70, 88, 105, 123)
+    assert latent["h3edit_scene_loop_closure"] is False
+    assert "scores 8 timed hold windows" in info
+
+
+def test_full_scene_orbit_uses_one_source_twice_for_loop_and_optional_angles():
+    builder = AddH3EditReference()
+    semantic_stack, _ = builder.add(
+        image=_image(height=600, width=900),
+        transport=REFERENCE_SEMANTIC,
+        semantic_resolution=1024,
+        native_reference_size=NATIVE_SIZE_MATCH,
+    )
+    mixed_stack, _ = builder.add(
+        image=_image(height=900, width=600),
+        transport=REFERENCE_NATIVE,
+        semantic_resolution=1024,
+        native_reference_size=NATIVE_SIZE_MATCH,
+        previous_references=semantic_stack,
+    )
+    clip, vae, (conditioning, latent, _fitted, prompt, info) = _encode(
+        REFERENCE_NONE,
+        quality_profile=QUALITY_SCENE_SHORT,
+        prompt_mode=PROMPT_SCENE_COVERAGE,
+        reference_stack=mixed_stack,
+        coverage_views=8,
+        coverage_arc_degrees=360.0,
+    )
+
+    assert len(clip.tokenize_calls[0][1]["minimax_ref_items"]) == 4
+    assert len(vae.encoded) == 2
+    assert [item["resolved_frame_index"] for item in conditioning[0][1]["minimax_keyframes"]] == [0, 123]
+    assert prompt.startswith("How the reference pictures align with the target video")
+    assert "<Picture 2> is an internal duplicate of <Picture 1>" in prompt
+    assert "<Picture 3> is a semantic Qwen-only alternate view of the exact same physical scene" in prompt
+    assert "<Picture 4> is a native Qwen+VAE alternate view of the exact same physical scene" in prompt
+    assert latent["h3edit_scene_loop_closure"] is True
+    assert "Picture 1 and its internal Picture 2 loop duplicate" not in info
+
+
+def test_semantic_scene_coverage_generates_a_brand_new_room_without_vae_anchor():
+    semantic_stack, _ = AddH3EditReference().add(
+        image=_image(height=600, width=900),
+        transport=REFERENCE_SEMANTIC,
+        semantic_resolution=1024,
+        native_reference_size=NATIVE_SIZE_MATCH,
+    )
+    clip, vae, (conditioning, latent, _fitted, prompt, info) = _encode(
+        REFERENCE_NONE,
+        quality_profile=QUALITY_SCENE_MEDIUM,
+        prompt_mode=PROMPT_SCENE_COVERAGE,
+        primary_image_role=PRIMARY_SEMANTIC_REFERENCE,
+        reference_stack=semantic_stack,
+        prompt="Create a new warm modern living room using Picture 1 for architecture and Picture 2 for furniture.",
+        coverage_views=12,
+    )
+
+    assert len(clip.tokenize_calls[0][1]["minimax_ref_items"]) == 2
+    assert len(vae.encoded) == 0
+    assert "minimax_keyframes" not in conditioning[0][1]
+    assert "minimax_refs" not in conditioning[0][1]
+    assert prompt.startswith("subject_definitions:\n<Subject 1> is one completely new, coherent room")
+    assert "summary:\n[reference generation]" in prompt
+    assert "No input picture is a source frame, composition anchor, or pixel anchor" in prompt
+    assert "<Picture 1> is a semantic Qwen-only design reference" in prompt
+    assert "<Picture 2> is a semantic Qwen-only design reference" in prompt
+    assert len(latent["h3edit_scene_capture_windows"]) == 12
+    assert "expected route FL2VA" in info
+
+
+def test_scene_mode_and_scene_profile_must_be_selected_together():
+    with pytest.raises(ValueError, match="requires a 'scene coverage"):
+        _encode(
+            REFERENCE_NONE,
+            prompt_mode=PROMPT_SCENE_COVERAGE,
+            quality_profile=QUALITY_RECOMMENDED,
+        )
+    with pytest.raises(ValueError, match=r"require 'directed \| frozen scene coverage"):
+        _encode(
+            REFERENCE_NONE,
+            prompt_mode=PROMPT_EDIT,
+            quality_profile=QUALITY_SCENE_LONG,
+        )
 
 
 @pytest.mark.parametrize("prompt_mode", [PROMPT_REPOSE, PROMPT_CHARACTER_SWAP])
@@ -610,3 +747,39 @@ def test_character_sheet_decoder_can_force_six_panel_layout():
     assert all_frames.shape == (124, 64, 48, 3)
     assert selected[:, 0, 0, 0].tolist() == [2.0, 21.0, 42.0, 63.0, 84.0, 113.0]
     assert "3x2 sheet" in info
+
+
+def test_scene_coverage_decoder_scores_each_hold_and_pads_contact_sheet():
+    vae = FakeVAE()
+    video = torch.zeros((1, 24, 37, 4, 3))
+    audio = torch.zeros((1, 32, 2, 207))
+    samples = {
+        "samples": FakeNestedTensor((video, audio)),
+        "h3edit_requested_frames": 124,
+        "h3edit_natural_frames": 124,
+        "h3edit_scene_capture_centers": (0, 21, 42, 63, 84, 105),
+        "h3edit_scene_capture_windows": ((0, 2), (19, 23), (40, 44), (61, 65), (82, 86), (103, 107)),
+        "h3edit_scene_capture_angles": (0.0, 60.0, 120.0, 180.0, 240.0, 300.0),
+        "h3edit_scene_direction": "clockwise / camera right",
+        "h3edit_scene_loop_closure": True,
+    }
+
+    sheet, selected, all_frames, info = DecodeH3SceneCoverage().decode(
+        samples,
+        vae,
+        columns=4,
+        gutter_px=6,
+        gutter_color="black",
+    )
+
+    assert sheet.shape == (1, 134, 210, 3)
+    assert selected.shape == (6, 64, 48, 3)
+    assert all_frames.shape == (124, 64, 48, 3)
+    selected_values = [int(value) for value in selected[:, 0, 0, 0].tolist()]
+    assert all(start <= value <= end for value, (start, end) in zip(
+        selected_values,
+        samples["h3edit_scene_capture_windows"],
+        strict=True,
+    ))
+    assert "stitched 4x2 contact sheet" in info
+    assert "first/final source loop closure" in info

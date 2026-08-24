@@ -2,12 +2,13 @@
 
 A deliberately small ComfyUI node pack for **single-image MiniMax H3 generation and photo editing**. It has no Director, hidden state, prompt analyzer, model loader, sampler wrapper, or custom frontend.
 
-The pack adds four nodes:
+The pack adds five nodes:
 
 - **Add H3 Edit Reference** — builds an ordered, chainable reference stack; every image independently chooses semantic or native transport.
 - **Text Encode H3 Edit / Generate** — switches between a strong source-photo edit and reference-driven generation, then builds H3 conditioning from optional ordered guides.
 - **Decode H3 Edit to One Image** — decodes the packet, scores its candidates, and returns one stable high-quality frame.
 - **Decode H3 Character Sheet** — extracts calibrated views from a 73/124-frame character orbit and stitches a 2x2 or 3x2 sheet.
+- **Decode H3 Scene Coverage** — scores every timed camera hold and returns 2–24 consistent viewpoints, a contact sheet, and the complete camera path.
 
 The still path produces exactly one image. By default, it samples the same short 5-frame context used by H3 Studio because H3 is a video model and a literal one-token latent leaves no temporal context around the result. Character-sheet profiles instead produce one stitched sheet plus optional selected/all-frame batches. The old true-one-frame path remains available as an explicitly experimental, low-quality option.
 
@@ -85,6 +86,32 @@ Write only the transformation you want. The selected preset rewrites it into the
 
 The included [directed-transformations workflow](example_workflows/H3_Directed_Transformations.json) defaults to semantic re-posing with Euler, the linear-quadratic scheduler, and 25 steps. Its visible note contains example instructions for all three presets and credits the continuous-camera method that inspired this extension.
 
+## Frozen scene coverage
+
+`directed | frozen scene coverage` generalizes the character-sheet camera method from one isolated character to a complete rigid room or scene. Select one of the 124-, 243-, or 362-frame scene-coverage profiles, choose 2–24 output views, set the camera arc and direction, and decode with **Decode H3 Scene Coverage**. The compiler writes exact timed camera waypoints and static capture windows; the decoder scores every window independently and returns its best stable frame.
+
+There are two scene origins:
+
+| Primary image role | Result | Input VAE anchor |
+|---|---|---:|
+| `edit \| strong scene anchor (FL2VA)` | Freeze and cover the room shown in Picture 1 | first frame; also final frame for optional 360° loop closure |
+| `generate \| semantic Picture 1 (FL2VA)` | Create a completely new room from Qwen-only design references, freeze it, then cover it | none |
+| `generate \| native Picture 1 (REF2VA)` | Create a new room with native high-detail references, freeze it, then cover it | no timeline keyframe; native reference blocks only |
+
+The anchored route works with only `source_image`. For a 360° path with loop closure enabled, the node internally presents that one image as both Picture 1 and Picture 2 and anchors the first and final frames to the same VAE latent. The user does not need to load the image twice. For a partial arc, only the first frame is anchored.
+
+Optional images from **Add H3 Edit Reference** are treated as additional angles of the same physical anchored room. They constrain occluded walls, openings, fixtures, furniture, materials, object placement, and lighting in one shared coordinate system. Semantic Qwen-only angles are recommended first; native alternate views remain experimental when mixed with FL2VA timeline keyframes.
+
+In semantic generation mode, Picture 1 and every semantic stack entry are design references rather than source frames. H3 synthesizes one new coherent room from their explicitly assigned architecture, furniture, materials, palette, or lighting, then freezes that generated world while the camera moves. An all-semantic setup does not VAE-encode any input image.
+
+| Coverage profile | Duration at 24 fps | Practical starting point |
+|---|---:|---:|
+| 124 frames | 5.17 s | 6–8 views |
+| 243 frames | 10.13 s | 8–12 views |
+| 362 frames | 15.08 s | 12–16 views |
+
+The interface permits up to 24 captures. More views mean shorter travel and hold windows; 362 frames is the safer choice for dense coverage. A single photograph cannot contain ground-truth geometry for invisible surfaces, so those areas remain a conservative H3 reconstruction. Real alternate angles improve fidelity substantially.
+
 ## Quality profiles
 
 The quality selector chooses the temporal context. Still profiles feed the one-image decoder; character-sheet profiles feed the sheet decoder.
@@ -147,8 +174,8 @@ For re-posing, character replacement, or camera movement, load [H3_Directed_Tran
 
 For a larger task-aware editor, connect the `text` output from
 [H3 Prompt IDE](https://github.com/ethanfel/ComfyUI-H3-Prompt-IDE) directly to
-this node's `prompt` input. Prompt IDE 0.7.0 and later detects the selected edit,
-re-pose, character-swap, new-angle, or character-sheet task and displays its
+this node's `prompt` input. Prompt IDE 0.8.0 and later detects the selected edit,
+re-pose, character-swap, new-angle, character-sheet, or frozen-scene task and displays its
 matching instruction category. It does not rewrite the text; this encoder still
 owns the full H3 task and timing wrapper. With `use prompt verbatim`, Prompt IDE
 keeps its manually selected full H3 schema instead.

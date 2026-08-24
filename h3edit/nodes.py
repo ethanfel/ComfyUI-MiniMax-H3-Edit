@@ -26,6 +26,9 @@ QUALITY_EXPERIMENTAL = "experimental | true 1 frame (low quality)"
 QUALITY_DIRECTED_CHANGE = "directed change | 39-frame settle -> 1 image"
 QUALITY_CHARACTER_FOUR = "character sheet | 4 panels / 73-frame orbit"
 QUALITY_CHARACTER_SIX = "character sheet | 6 panels / 124-frame orbit"
+QUALITY_SCENE_SHORT = "scene coverage | 124-frame camera path"
+QUALITY_SCENE_MEDIUM = "scene coverage | 243-frame camera path"
+QUALITY_SCENE_LONG = "scene coverage | 362-frame camera path"
 QUALITY_PROFILES = {
     QUALITY_RECOMMENDED: 5,
     QUALITY_EXTENDED: 9,
@@ -35,6 +38,14 @@ QUALITY_PROFILES = {
     QUALITY_DIRECTED_CHANGE: 39,
     QUALITY_CHARACTER_FOUR: 73,
     QUALITY_CHARACTER_SIX: 124,
+    QUALITY_SCENE_SHORT: 124,
+    QUALITY_SCENE_MEDIUM: 243,
+    QUALITY_SCENE_LONG: 362,
+}
+SCENE_COVERAGE_PROFILES = {
+    QUALITY_SCENE_SHORT,
+    QUALITY_SCENE_MEDIUM,
+    QUALITY_SCENE_LONG,
 }
 CHARACTER_SHEET_FRAME_INDICES = {
     QUALITY_CHARACTER_FOUR: (2, 24, 45, 68),
@@ -62,9 +73,14 @@ PROMPT_EDIT = "edit instruction"
 PROMPT_REPOSE = "directed | re-pose character"
 PROMPT_CHARACTER_SWAP = "directed | character swap"
 PROMPT_NEW_ANGLE = "directed | new camera angle"
+PROMPT_SCENE_COVERAGE = "directed | frozen scene coverage"
 PROMPT_VERBATIM = "use prompt verbatim"
 DIRECTED_PROMPT_MODES = [PROMPT_REPOSE, PROMPT_CHARACTER_SWAP, PROMPT_NEW_ANGLE]
-PROMPT_MODES = [PROMPT_EDIT, *DIRECTED_PROMPT_MODES, PROMPT_VERBATIM]
+PROMPT_MODES = [PROMPT_EDIT, *DIRECTED_PROMPT_MODES, PROMPT_SCENE_COVERAGE, PROMPT_VERBATIM]
+
+SCENE_DIRECTION_CLOCKWISE = "clockwise / camera right"
+SCENE_DIRECTION_COUNTERCLOCKWISE = "counterclockwise / camera left"
+SCENE_DIRECTIONS = [SCENE_DIRECTION_CLOCKWISE, SCENE_DIRECTION_COUNTERCLOCKWISE]
 
 SOURCE_FIT_MODES = ["crop center", "contain / pad", "stretch"]
 NATIVE_SIZE_MATCH = "match output area"
@@ -226,6 +242,191 @@ def _guide_contract(ordinal: int, reference_mode: str, *, generation: bool) -> s
     return ""
 
 
+def _format_h3_time(frame_index: int) -> str:
+    total_ms = round((max(0, int(frame_index)) / FPS) * 1000)
+    minutes, remainder = divmod(total_ms, 60_000)
+    seconds, milliseconds = divmod(remainder, 1000)
+    return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+
+
+def _scene_capture_plan(
+    frame_count: int,
+    view_count: int,
+    arc_degrees: float,
+    hold_frames: int,
+) -> dict[str, Any]:
+    frame_count = max(5, int(frame_count))
+    view_count = max(2, min(24, int(view_count)))
+    arc_degrees = max(15.0, min(360.0, float(arc_degrees)))
+    full_orbit = math.isclose(arc_degrees, 360.0, abs_tol=0.001)
+    denomin = view_count if full_orbit else view_count - 1
+    positions = [index / denomin for index in range(view_count)]
+    centers = [round((frame_count - 1) * position) for position in positions]
+    angles = [arc_degrees * position for position in positions]
+    minimum_gap = min(
+        (right - left for left, right in zip(centers, centers[1:], strict=False)),
+        default=frame_count,
+    )
+    requested_radius = max(0, (max(1, int(hold_frames)) - 1) // 2)
+    radius = min(requested_radius, max(0, (minimum_gap - 1) // 2))
+    windows = [
+        (max(0, center - radius), min(frame_count - 1, center + radius))
+        for center in centers
+    ]
+    return {
+        "frame_count": frame_count,
+        "view_count": view_count,
+        "arc_degrees": arc_degrees,
+        "full_orbit": full_orbit,
+        "centers": tuple(centers),
+        "angles": tuple(angles),
+        "windows": tuple(windows),
+        "hold_frames": radius * 2 + 1,
+    }
+
+
+def _scene_reference_contract(
+    reference_modes: list[str],
+    first_ordinal: int,
+) -> str:
+    if not reference_modes:
+        return (
+            "No alternate-angle reference is supplied. Infer only genuinely occluded surfaces as conservative, "
+            "geometrically coherent continuations of the visible room; never redesign, replace, move, or duplicate "
+            "anything already established by <Picture 1>."
+        )
+    records = []
+    for ordinal, reference_mode in enumerate(reference_modes, start=first_ordinal):
+        transport = (
+            "semantic Qwen-only alternate view"
+            if reference_mode == REFERENCE_SEMANTIC
+            else "native Qwen+VAE alternate view"
+        )
+        records.append(
+            f"<Picture {ordinal}> is a {transport} of the exact same physical scene, not a style, identity, or "
+            "composition donor. Use its visible walls, openings, fixtures, objects, placements, materials, and lighting "
+            "to constrain one shared world coordinate system; it is not a timeline keyframe."
+        )
+    return " ".join(records) + (
+        " Where alternate views overlap <Picture 1>, <Picture 1> has priority; use the alternate views primarily to "
+        "resolve geometry and appearance that the source camera cannot see."
+    )
+
+
+def _scene_generation_contract(reference_modes: list[str]) -> str:
+    records = []
+    for ordinal, reference_mode in enumerate(reference_modes, start=1):
+        transport = (
+            "semantic Qwen-only design reference"
+            if reference_mode == REFERENCE_SEMANTIC
+            else "native Qwen+VAE design reference"
+        )
+        records.append(
+            f"<Picture {ordinal}> is a {transport} for <Subject 1>. Use only the room geometry, architecture, furniture, "
+            "materials, palette, lighting, or camera relationships explicitly assigned by the instruction; it is not a "
+            "source frame or timeline keyframe."
+        )
+    return " ".join(records)
+
+
+def _build_scene_coverage_prompt(
+    prompt: str,
+    reference_modes: list[str],
+    frame_count: int,
+    direction: str,
+    capture_plan: dict[str, Any],
+    loop_closure: bool,
+    anchored_scene: bool,
+) -> str:
+    duration = frame_count / FPS
+    direction_word = "clockwise" if direction == SCENE_DIRECTION_CLOCKWISE else "counterclockwise"
+    origin_view = "source view" if anchored_scene else "generated opening view"
+    waypoint_records = []
+    for view_number, (angle, center, window) in enumerate(
+        zip(capture_plan["angles"], capture_plan["centers"], capture_plan["windows"], strict=True),
+        start=1,
+    ):
+        start, end = window
+        waypoint_records.append(
+            f"capture {view_number} at {_format_h3_time(center)} ({angle:g} degrees {direction_word} from the "
+            f"{origin_view}), holding completely static from {_format_h3_time(start)} through {_format_h3_time(end)}"
+        )
+    waypoints = "; ".join(waypoint_records) + "."
+    motion_contract = (
+        f"The camera follows one continuous {capture_plan['arc_degrees']:g}-degree {direction_word} arc at the initial "
+        "camera height and constant radius, always aimed at the declared orbit center. Preserve one fixed focal length, "
+        "field of view, exposure, white balance, focus behavior, horizon, and camera roll. Perspective, occlusion, and "
+        "parallax change only as physically required by camera translation; view-dependent reflections may respond "
+        "naturally, but lighting and material identity do not change. Do not pan independently, zoom, dolly inward or "
+        "outward, pedestal, roll, shake, cut, relight, animate, morph geometry, bend walls, slide textures, duplicate or "
+        "remove objects, add doors or windows, or turn the room into a different place. Newly revealed surfaces must be "
+        "conservative, spatially consistent continuations constrained by all available views. The camera moves smoothly "
+        "between exact capture waypoints, decelerates into each hold, becomes perfectly motionless throughout that hold, "
+        "and resumes smoothly afterward. Every hold produces crisp matching still frames with no motion blur. Exact "
+        f"waypoint schedule: {waypoints}"
+    )
+
+    if not anchored_scene:
+        picture_contract = _scene_generation_contract(reference_modes)
+        return (
+            "subject_definitions:\n"
+            "<Subject 1> is one completely new, coherent room generated from the ordered reference pictures according "
+            f"to this design and orbit-center assignment: {prompt or 'Create a complete room and orbit its geometric center.'}\n"
+            f"{picture_contract}\n\n"
+            "summary:\n"
+            f"[reference generation] The target creates <Subject 1> as one new frozen three-dimensional room, then records "
+            f"{capture_plan['view_count']} consistent camera views across one {capture_plan['arc_degrees']:g}-degree "
+            f"{direction_word} arc without treating any input picture as a source frame.\n\n"
+            "retention_analysis:\n"
+            "<Subject 1> (appears throughout [Shot 1]): fully_preserved - after the new room is established, preserve its "
+            "complete architecture, dimensions, wall openings, fixtures, furniture, objects, materials, colors, lighting, "
+            "and spatial relationships without drift at every camera position.\n\n"
+            "detailed_description:\n"
+            "The target uses the requested source-matched or photorealistic visual style with crisp architectural detail "
+            "and stable world-space lighting. [Shot 1] First synthesize <Subject 1> as one complete physical room from the "
+            "assigned aspects of the reference pictures. No input picture is a source frame, composition anchor, or pixel "
+            "anchor. Resolve the references into one new layout rather than copying any source composition wholesale. Once "
+            "established, treat the complete room as a rigid, frozen three-dimensional set in one fixed world coordinate "
+            "system. Every person remains frozen in the identical pose and expression; every movable object, fabric fold, "
+            "prop, door, window, fixture, reflection source, shadow caster, and light source remains fixed. Only the physical "
+            f"camera moves. {motion_contract}\n\n"
+            "overall_soundscape:\nN/A\n\n"
+            "non_diegetic_music:\nN/A"
+        )
+
+    first_reference_ordinal = 3 if loop_closure else 2
+    references = _scene_reference_contract(reference_modes, first_reference_ordinal)
+    if loop_closure:
+        alignment = (
+            "How the reference pictures align with the target video — Picture 1 (from Shot 1) aligns with the "
+            f"0.00-second mark of the target video; Picture 2 (from Shot 1) aligns with the {duration:.2f}-second "
+            "mark of the target video."
+        )
+        closure = (
+            "<Picture 2> is an internal duplicate of <Picture 1> and fixes the final frame to the exact original "
+            "view for 360-degree loop closure. After the last unique capture, return precisely to <Picture 2>."
+        )
+    else:
+        alignment = (
+            "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced."
+        )
+        closure = "The final viewpoint remains free and is determined by the requested camera arc."
+
+    return (
+        f"{alignment}\n\n"
+        "integrated_multimodal_description: [Shot 1] Live-action or source-matched imagery. <Picture 1> establishes "
+        "the exact opening pixels, composition, people, objects, environment, geometry, materials, colors, exposure, "
+        "shadows, and lighting of one physical scene. Treat the complete scene as a rigid, frozen three-dimensional "
+        "set in one fixed world coordinate system. Every person remains frozen in the identical pose and expression; "
+        "every movable object, fabric fold, prop, door, window, fixture, reflection source, shadow caster, and light "
+        "source remains fixed. Only the physical camera moves. "
+        f"Scene and orbit-center instruction: {prompt or 'Orbit around the geometric center of the room.'} "
+        f"{references} {closure} {motion_contract}\n\n"
+        "overall_soundscape: N/A\n\n"
+        "non_diegetic_music: N/A"
+    )
+
+
 def _build_character_sheet_prompt(
     prompt: str,
     reference_modes: list[str],
@@ -374,10 +575,35 @@ def _build_prompt(
     reference_modes: list[str],
     frame_count: int,
     primary_image_role: str,
+    *,
+    scene_capture_plan: dict[str, Any] | None = None,
+    scene_direction: str = SCENE_DIRECTION_CLOCKWISE,
+    scene_loop_closure: bool = False,
 ) -> str:
     prompt = (prompt or "").strip()
     if prompt_mode == PROMPT_VERBATIM:
         return prompt
+
+    if prompt_mode == PROMPT_SCENE_COVERAGE:
+        if scene_capture_plan is None:
+            raise ValueError("Frozen scene coverage requires a camera capture plan.")
+        anchored_scene = primary_image_role == PRIMARY_EDIT_ANCHOR
+        if anchored_scene:
+            picture_modes = reference_modes
+        else:
+            primary_transport = (
+                REFERENCE_SEMANTIC if primary_image_role == PRIMARY_SEMANTIC_REFERENCE else REFERENCE_NATIVE
+            )
+            picture_modes = [primary_transport, *reference_modes]
+        return _build_scene_coverage_prompt(
+            prompt,
+            picture_modes,
+            frame_count,
+            scene_direction,
+            scene_capture_plan,
+            scene_loop_closure and anchored_scene,
+            anchored_scene,
+        )
 
     if frame_count in {73, 124}:
         return _build_character_sheet_prompt(prompt, reference_modes, primary_image_role, frame_count)
@@ -631,7 +857,8 @@ class TextEncodeH3Edit:
     DESCRIPTION = (
         "Switch Picture 1 between a strong FL2VA source anchor, a semantic FL2VA generation reference, or a native "
         "REF2VA generation reference. Additional ordered guides independently use Qwen-only semantic or native "
-        "Qwen+VAE transport. Quality modes use a short hidden temporal packet but emit one final image."
+        "Qwen+VAE transport. It also compiles frozen-scene camera coverage from one anchored room or semantic/native "
+        "references for a completely new room."
     )
 
     @classmethod
@@ -698,8 +925,8 @@ class TextEncodeH3Edit:
                     {
                         "default": PROMPT_EDIT,
                         "tooltip": (
-                            "Choose ordinary edit/generation, an anchored directed transformation, or verbatim text. "
-                            "Directed tasks require the 39-frame settle profile."
+                            "Choose ordinary edit/generation, an anchored directed transformation, frozen-scene camera "
+                            "coverage, or verbatim text. Scene coverage requires a matching 124/243/362-frame profile."
                         ),
                     },
                 ),
@@ -736,7 +963,8 @@ class TextEncodeH3Edit:
                         "tooltip": (
                             "H3 is video-trained. Recommended matches Studio's short 5-frame context, then the decoder "
                             "returns one stable frame. Character-sheet profiles create calibrated 73/124-frame orbits for "
-                            "the dedicated sheet decoder. True 1-frame mode is often poor quality."
+                            "the dedicated sheet decoder. Scene-coverage profiles create a trained-range camera path for "
+                            "the dedicated coverage decoder. True 1-frame mode is often poor quality."
                         ),
                     },
                 ),
@@ -749,6 +977,53 @@ class TextEncodeH3Edit:
                         )
                     },
                 ),
+                "coverage_views": (
+                    "INT",
+                    {
+                        "default": 12,
+                        "min": 2,
+                        "max": 24,
+                        "step": 1,
+                        "tooltip": "Number of unique scene viewpoints and output images for frozen scene coverage.",
+                    },
+                ),
+                "coverage_arc_degrees": (
+                    "FLOAT",
+                    {
+                        "default": 360.0,
+                        "min": 15.0,
+                        "max": 360.0,
+                        "step": 15.0,
+                        "tooltip": "Physical camera arc from the source/generated opening viewpoint.",
+                    },
+                ),
+                "coverage_direction": (
+                    SCENE_DIRECTIONS,
+                    {
+                        "default": SCENE_DIRECTION_CLOCKWISE,
+                        "tooltip": "Direction in which the physical camera travels around the declared orbit center.",
+                    },
+                ),
+                "coverage_hold_frames": (
+                    "INT",
+                    {
+                        "default": 5,
+                        "min": 1,
+                        "max": 9,
+                        "step": 2,
+                        "tooltip": "Requested static frames around each capture; automatically reduced if views are close.",
+                    },
+                ),
+                "coverage_loop_closure": (
+                    "BOOLEAN",
+                    {
+                        "default": True,
+                        "tooltip": (
+                            "For a 360-degree anchored room, internally reuse the one source image as the final keyframe. "
+                            "Ignored for partial arcs and reference-generated rooms."
+                        ),
+                    },
+                ),
             },
         }
 
@@ -756,7 +1031,7 @@ class TextEncodeH3Edit:
     RETURN_NAMES = ("positive", "latent", "fitted_source", "encoded_prompt", "info")
     OUTPUT_TOOLTIPS = (
         "Positive conditioning with the selected Picture 1 role and every ordered guide transport.",
-        "An H3 latent with the selected still or character-sheet temporal profile.",
+        "An H3 latent with the selected still, character-sheet, or frozen-scene temporal profile.",
         "Picture 1 after preparation for its selected anchor/reference role.",
         "The exact prompt sent after the visual token blocks.",
         "Reference transport, Qwen size, VAE usage, and checkpoint guidance.",
@@ -781,6 +1056,11 @@ class TextEncodeH3Edit:
         reference_image: torch.Tensor | None = None,
         quality_profile: str = QUALITY_RECOMMENDED,
         reference_stack: tuple[dict[str, Any], ...] | None = None,
+        coverage_views: int = 12,
+        coverage_arc_degrees: float = 360.0,
+        coverage_direction: str = SCENE_DIRECTION_CLOCKWISE,
+        coverage_hold_frames: int = 5,
+        coverage_loop_closure: bool = True,
     ):
         import node_helpers
 
@@ -795,10 +1075,21 @@ class TextEncodeH3Edit:
         if quality_profile not in QUALITY_PROFILES:
             raise ValueError(f"Unknown quality_profile: {quality_profile}")
         directed_task = prompt_mode in DIRECTED_PROMPT_MODES
+        scene_task = prompt_mode == PROMPT_SCENE_COVERAGE
+        scene_profile = quality_profile in SCENE_COVERAGE_PROFILES
         if directed_task and primary_image_role != PRIMARY_EDIT_ANCHOR:
             raise ValueError("Directed re-pose, character-swap, and camera-angle tasks require the strong Picture 1 anchor.")
         if directed_task and quality_profile != QUALITY_DIRECTED_CHANGE:
             raise ValueError("Directed tasks require 'directed change | 39-frame settle -> 1 image'.")
+        if scene_task and not scene_profile:
+            raise ValueError("Frozen scene coverage requires a 'scene coverage | ... camera path' quality profile.")
+        if scene_profile and not scene_task:
+            raise ValueError("Scene-coverage quality profiles require 'directed | frozen scene coverage' prompt mode.")
+        if coverage_direction not in SCENE_DIRECTIONS:
+            raise ValueError(f"Unknown coverage direction: {coverage_direction}")
+        coverage_views = max(2, min(24, int(coverage_views)))
+        coverage_arc_degrees = max(15.0, min(360.0, float(coverage_arc_degrees)))
+        coverage_hold_frames = max(1, min(9, int(coverage_hold_frames)))
         if quality_profile in CHARACTER_SHEET_FRAME_INDICES and primary_image_role == PRIMARY_EDIT_ANCHOR:
             raise ValueError(
                 "Character-sheet profiles require semantic or native generation mode; Picture 1 cannot be a frame anchor."
@@ -808,6 +1099,12 @@ class TextEncodeH3Edit:
         height = _round_dimension(height)
         primary_image = _validate_image(source_image, "source_image")
         anchored_edit = primary_image_role == PRIMARY_EDIT_ANCHOR
+        scene_loop_closure = bool(
+            scene_task
+            and anchored_edit
+            and coverage_loop_closure
+            and math.isclose(coverage_arc_degrees, 360.0, abs_tol=0.001)
+        )
         source_latent = None
         visual_items: list[dict[str, Any]] = []
         ref_blocks: list[dict[str, Any]] = []
@@ -816,7 +1113,11 @@ class TextEncodeH3Edit:
             fitted_source = _resize(primary_image, width, height, source_fit)
             source_latent = vae.encode(fitted_source)
             visual_items.append({"type": "image", "data": fitted_source})
-            first_reference_ordinal = 2
+            if scene_loop_closure:
+                visual_items.append({"type": "image", "data": fitted_source})
+                first_reference_ordinal = 3
+            else:
+                first_reference_ordinal = 2
         else:
             primary_transport = (
                 REFERENCE_SEMANTIC
@@ -908,7 +1209,11 @@ class TextEncodeH3Edit:
                 reference_notes.append(f"Picture {ordinal} native Qwen+VAE {native_width}x{native_height}")
 
         if anchored_edit and not reference_notes:
-            reference_note = "No guide references; only Picture 1 is presented to Qwen."
+            reference_note = (
+                "No alternate-angle guides; Picture 1 and its internal Picture 2 loop duplicate are presented to Qwen."
+                if scene_loop_closure
+                else "No guide references; only Picture 1 is presented to Qwen."
+            )
         else:
             reference_kind = "guide" if anchored_edit else "generation reference"
             checkpoint = "FL2VA edit" if anchored_edit else "REF2VA" if native_count else "FL2VA"
@@ -929,6 +1234,19 @@ class TextEncodeH3Edit:
 
         requested_frames = QUALITY_PROFILES[quality_profile]
         latent, natural_frames = _empty_h3_edit_latent(width, height, requested_frames)
+        scene_capture_plan = None
+        if scene_task:
+            scene_capture_plan = _scene_capture_plan(
+                natural_frames,
+                coverage_views,
+                coverage_arc_degrees,
+                coverage_hold_frames,
+            )
+            latent["h3edit_scene_capture_centers"] = scene_capture_plan["centers"]
+            latent["h3edit_scene_capture_windows"] = scene_capture_plan["windows"]
+            latent["h3edit_scene_capture_angles"] = scene_capture_plan["angles"]
+            latent["h3edit_scene_direction"] = coverage_direction
+            latent["h3edit_scene_loop_closure"] = scene_loop_closure
         if quality_profile == QUALITY_DIRECTED_CHANGE:
             latent["h3edit_selection_strategy"] = "settled_tail"
             latent["h3edit_tail_candidates"] = 5
@@ -942,19 +1260,25 @@ class TextEncodeH3Edit:
             additional_modes,
             requested_frames,
             primary_image_role,
+            scene_capture_plan=scene_capture_plan,
+            scene_direction=coverage_direction,
+            scene_loop_closure=scene_loop_closure,
         )
         tokens = clip.tokenize(encoded_prompt, minimax_ref_items=visual_items)
         conditioning = clip.encode_from_tokens_scheduled(tokens)
         conditioning_values: dict[str, Any] = {"minimax_frame_count": natural_frames}
         if anchored_edit:
-            conditioning_values["minimax_keyframes"] = [{"resolved_frame_index": 0, "latent": source_latent}]
+            keyframes = [{"resolved_frame_index": 0, "latent": source_latent}]
+            if scene_loop_closure:
+                keyframes.append({"resolved_frame_index": natural_frames - 1, "latent": source_latent})
+            conditioning_values["minimax_keyframes"] = keyframes
         if ref_blocks:
             conditioning_values["minimax_refs"] = ref_blocks
         conditioning = node_helpers.conditioning_set_values(conditioning, conditioning_values)
 
         ignored_note = " The direct reference_image is intentionally ignored." if ignored_direct else ""
         if anchored_edit:
-            task_label = f" | {prompt_mode}" if directed_task else ""
+            task_label = f" | {prompt_mode}" if directed_task or scene_task else ""
             mode_note = (
                 f"Strong-anchor edit{task_label} | Picture 1 native frame-zero keyframe ({tuple(source_latent.shape)})"
             )
@@ -963,6 +1287,11 @@ class TextEncodeH3Edit:
             mode_note = f"Reference-driven generation | no frame-zero keyframe | expected route {route}"
         if quality_profile in CHARACTER_SHEET_FRAME_INDICES:
             decoder_note = "Decode H3 Character Sheet extracts the calibrated views and returns a stitched sheet."
+        elif scene_profile:
+            decoder_note = (
+                f"Decode H3 Scene Coverage scores {coverage_views} timed hold windows and returns every selected view "
+                "plus a contact sheet."
+            )
         elif quality_profile == QUALITY_DIRECTED_CHANGE:
             decoder_note = (
                 "Decode H3 Edit to One Image scores only the settled tail and returns the completed transformation."
@@ -1037,6 +1366,26 @@ def _stitch_character_panels(
             sheet_parts.append(panels.new_full((gutter_px, stitched_width, channels), gutter_value))
         sheet_parts.append(row)
     return torch.cat(sheet_parts, dim=0).unsqueeze(0)
+
+
+def _stitch_scene_panels(
+    panels: torch.Tensor,
+    columns: int,
+    gutter_px: int,
+    gutter_value: float,
+) -> tuple[torch.Tensor, int, int]:
+    if panels.ndim != 4 or int(panels.shape[0]) < 1:
+        raise ValueError("Scene-coverage panels must be a non-empty IMAGE batch [N,H,W,C].")
+    panel_count = int(panels.shape[0])
+    columns = max(1, min(int(columns), panel_count))
+    rows = math.ceil(panel_count / columns)
+    missing = rows * columns - panel_count
+    if missing:
+        filler = panels.new_full((missing, *panels.shape[1:]), gutter_value)
+        grid_panels = torch.cat((panels, filler), dim=0)
+    else:
+        grid_panels = panels
+    return _stitch_character_panels(grid_panels, columns, gutter_px, gutter_value), columns, rows
 
 
 class DecodeH3SingleFrame:
@@ -1170,11 +1519,108 @@ class DecodeH3CharacterSheet:
         )
 
 
+class DecodeH3SceneCoverage:
+    """Decode a frozen-scene camera path into individually scored viewpoints."""
+
+    DESCRIPTION = (
+        "Decodes an H3 frozen-scene camera path, scores each encoded hold window for a stable crisp frame, and returns "
+        "every selected viewpoint plus a contact sheet and the complete generated path."
+    )
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "samples": ("LATENT", {"tooltip": "Sampled latent from frozen scene coverage mode."}),
+                "vae": ("VAE", {"tooltip": "MiniMax H3 video VAE."}),
+                "columns": (
+                    "INT",
+                    {"default": 4, "min": 1, "max": 8, "step": 1, "tooltip": "Contact-sheet columns."},
+                ),
+                "gutter_px": ("INT", {"default": 6, "min": 0, "max": 256, "step": 1}),
+                "gutter_color": (GUTTER_COLORS, {"default": "black"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "STRING")
+    RETURN_NAMES = ("contact_sheet", "selected_views", "all_frames", "info")
+    OUTPUT_TOOLTIPS = (
+        "One contact sheet containing every selected scene viewpoint.",
+        "The selected viewpoints as an IMAGE batch in camera-path order.",
+        "Every decoded camera-path frame for inspection or alternate picks.",
+        "Capture targets, chosen frames, angles, windows, loop mode, and sheet dimensions.",
+    )
+    FUNCTION = "decode"
+    CATEGORY = CATEGORY
+
+    def decode(
+        self,
+        samples: dict[str, Any],
+        vae: Any,
+        columns: int,
+        gutter_px: int,
+        gutter_color: str,
+    ):
+        if gutter_color not in GUTTER_COLORS:
+            raise ValueError(f"Unknown gutter color: {gutter_color}")
+        windows = samples.get("h3edit_scene_capture_windows") if isinstance(samples, dict) else None
+        centers = samples.get("h3edit_scene_capture_centers") if isinstance(samples, dict) else None
+        angles = samples.get("h3edit_scene_capture_angles") if isinstance(samples, dict) else None
+        if not isinstance(windows, (tuple, list)) or not windows:
+            raise ValueError("Decode H3 Scene Coverage requires a latent encoded by frozen scene coverage mode.")
+        if not isinstance(centers, (tuple, list)) or len(centers) != len(windows):
+            raise ValueError("Frozen scene coverage latent has invalid capture-center metadata.")
+
+        video, frames, decoded_frames = _decode_h3_frames(samples, vae, "Decode H3 Scene Coverage")
+        requested_frames = min(
+            decoded_frames,
+            max(1, int(samples.get("h3edit_requested_frames", decoded_frames))),
+        )
+        selected_indices = []
+        selected_frames = []
+        for view_number, window in enumerate(windows, start=1):
+            if not isinstance(window, (tuple, list)) or len(window) != 2:
+                raise ValueError(f"Frozen scene capture window {view_number} is invalid: {window}")
+            start = max(0, int(window[0]))
+            end = min(requested_frames - 1, int(window[1]))
+            if start > end:
+                raise ValueError(
+                    f"Frozen scene capture window {view_number} ({start}-{end}) is outside "
+                    f"the decoded {requested_frames}-frame path."
+                )
+            relative_index, _score = _stable_quality_frame(frames[start : end + 1])
+            selected_index = start + relative_index
+            selected_indices.append(selected_index)
+            selected_frames.append(frames[selected_index])
+
+        selected = torch.stack(selected_frames).clone()
+        gutter_value = {"black": 0.0, "neutral gray": 0.5, "white": 1.0}[gutter_color]
+        sheet, resolved_columns, rows = _stitch_scene_panels(
+            selected,
+            columns,
+            gutter_px,
+            gutter_value,
+        )
+        angle_note = [round(float(angle), 3) for angle in angles] if isinstance(angles, (tuple, list)) else []
+        direction = str(samples.get("h3edit_scene_direction", "unknown direction"))
+        loop_note = "first/final source loop closure" if samples.get("h3edit_scene_loop_closure") else "open path"
+        return (
+            sheet,
+            selected,
+            frames,
+            f"Decoded H3 latent {tuple(video.shape)} to {decoded_frames} frame(s); scored capture windows "
+            f"{[list(window) for window in windows]} and selected frames {selected_indices} at angles {angle_note}; "
+            f"{direction}, {loop_note}; stitched {resolved_columns}x{rows} contact sheet {tuple(sheet.shape)} with "
+            f"{gutter_px}px {gutter_color} gutters.",
+        )
+
+
 NODE_CLASS_MAPPINGS = {
     "AddH3EditReference": AddH3EditReference,
     "TextEncodeH3Edit": TextEncodeH3Edit,
     "DecodeH3SingleFrame": DecodeH3SingleFrame,
     "DecodeH3CharacterSheet": DecodeH3CharacterSheet,
+    "DecodeH3SceneCoverage": DecodeH3SceneCoverage,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -1182,4 +1628,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TextEncodeH3Edit": "Text Encode H3 Edit / Generate",
     "DecodeH3SingleFrame": "Decode H3 Edit to One Image",
     "DecodeH3CharacterSheet": "Decode H3 Character Sheet",
+    "DecodeH3SceneCoverage": "Decode H3 Scene Coverage",
 }
