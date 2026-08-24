@@ -25,6 +25,7 @@ The main encoder is always compact. Its old task-specific inputs remain in the b
 | `directed \| new camera angle` | camera compiler + 39-frame settled change |
 | `character sheet \| canonical 6 views` | six-view compiler + 124-frame orbit |
 | `scene coverage \| canonical camera path` | frozen-scene compiler + 124 frames + 12 views + 360° clockwise arc + five-frame holds + loop closure |
+| `scene coverage \| cinematic hard cuts` | frozen-scene compiler + 124 frames + eight discrete cinematic shots around one named target; no camera travel |
 | `advanced \| prompt verbatim` | unchanged prompt + recommended 5-frame context |
 
 Leave `show_overrides` disabled and hidden stale values are ignored—the canonical preset is authoritative. Enable it only when deliberately changing a compatible frame profile, reference transport/size, source fit, or scene-coverage geometry. An incompatible profile override produces a clear validation error rather than silently building a contradictory task.
@@ -106,6 +107,14 @@ The included [directed-transformations workflow](example_workflows/H3_Directed_T
 ## Frozen scene coverage
 
 `scene coverage | canonical camera path` generalizes the character-sheet camera method from one isolated character to a complete rigid room or scene. Selecting this one mode supplies a complete 124-frame, 12-view, 360° clockwise preset. Enable overrides only when a 243/362-frame path, different view count, partial arc, opposite direction, different hold, or disabled loop closure is intentional. Decode with **Decode H3 Scene Coverage**. The compiler writes exact timed camera waypoints and static capture windows; the decoder scores every window independently and returns its best stable frame.
+
+`scene coverage | cinematic hard cuts` is the discontinuous alternative. In the instruction, identify one exact coverage target—a person, object, architectural feature, or fixed point in the scene. The canonical preset creates eight separately composed static shots around that target, using wide, three-quarter, profile, low-angle, high-angle, reverse, detail, and hero-style setups. Every cut has an exact timestamp and every shot has a timed extraction window. The prompt explicitly forbids an orbit or any intermediate camera travel: the first frame after each hard cut must already be the resolved new perspective. The scene remains frozen across the cut; only camera placement, height, lens, and framing may change.
+
+Example instruction:
+
+```text
+Coverage target: the woman seated at the desk in <Picture 1>. Keep her centered as the persistent visual subject while preserving her exact pose, expression, wardrobe, desk, room geometry, props, materials, lighting, and shadows across every cinematic camera cut.
+```
 
 There are two scene origins:
 

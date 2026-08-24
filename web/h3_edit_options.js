@@ -2,7 +2,10 @@ import {app} from "/scripts/app.js";
 
 const ENCODER_NODE = "TextEncodeH3Edit";
 const OPTIONS_NODE = "H3EditOptions";
-const SCENE_MODE = "scene coverage | canonical camera path";
+const SCENE_MODES = new Set([
+    "scene coverage | canonical camera path",
+    "scene coverage | cinematic hard cuts",
+]);
 const LEGACY_OPTION_WIDGETS = new Set([
     "reference_mode",
     "source_fit",
@@ -69,7 +72,7 @@ function refreshEncoder(node) {
 function refreshOptions(node) {
     const mode = String(widget(node, "mode")?.value ?? "");
     const expanded = Boolean(widget(node, "show_overrides")?.value);
-    const scene = mode === SCENE_MODE;
+    const scene = SCENE_MODES.has(mode);
     for (const item of node.widgets ?? []) {
         if (["mode", "show_overrides"].includes(item.name)) continue;
         if (COVERAGE_WIDGETS.has(item.name)) setWidgetVisible(item, expanded && scene);

@@ -13,6 +13,7 @@ from h3edit.nodes import (
     OPTION_MODE_CHARACTER_SHEET,
     OPTION_MODE_REPOSE,
     OPTION_MODE_SCENE_COVERAGE,
+    OPTION_MODE_SCENE_CUTS,
     OPTION_PROFILE_CANONICAL,
     PRIMARY_EDIT_ANCHOR,
     PRIMARY_NATIVE_REFERENCE,
@@ -22,6 +23,7 @@ from h3edit.nodes import (
     PROMPT_NEW_ANGLE,
     PROMPT_REPOSE,
     PROMPT_SCENE_COVERAGE,
+    PROMPT_SCENE_CUTS,
     PROMPT_VERBATIM,
     QUALITY_CHARACTER_FOUR,
     QUALITY_CHARACTER_SIX,
@@ -188,6 +190,17 @@ def test_options_mode_sends_canonical_scene_settings_without_manual_coordination
     assert options["coverage_arc_degrees"] == 360.0
     assert options["coverage_hold_frames"] == 5
     assert options["coverage_loop_closure"] is True
+
+
+def test_cinematic_cut_mode_sends_eight_view_hard_cut_preset():
+    options = _options(OPTION_MODE_SCENE_CUTS)
+
+    assert options["prompt_mode"] == PROMPT_SCENE_CUTS
+    assert options["quality_profile"] == QUALITY_SCENE_SHORT
+    assert options["coverage_views"] == 8
+    assert options["coverage_arc_degrees"] == 360.0
+    assert options["coverage_hold_frames"] == 5
+    assert options["coverage_loop_closure"] is False
 
 
 def test_options_allow_deliberate_compatible_overrides():
@@ -422,6 +435,7 @@ def test_directed_repose_builds_anchored_i2va_settle_packet():
         "For the target video, at 0.00 seconds into the target video, "
         "<Picture 1> (from [Shot 1]) is fully referenced."
     )
+    assert "integrated_multimodal_description: [Shot 1]" in prompt
     assert prompt.index("integrated_multimodal_description:") < prompt.index("overall_soundscape:")
     assert prompt.index("overall_soundscape:") < prompt.index("non_diegetic_music:")
     assert "camera remains completely static" in prompt
@@ -541,6 +555,53 @@ def test_full_scene_orbit_uses_one_source_twice_for_loop_and_optional_angles():
     assert "Picture 1 and its internal Picture 2 loop duplicate" not in info
 
 
+def test_frozen_cinematic_cuts_jump_around_a_designated_person_without_camera_travel():
+    options = _options(OPTION_MODE_SCENE_CUTS)
+    clip, vae, (conditioning, latent, _fitted, prompt, info) = _encode(
+        REFERENCE_NONE,
+        options=options,
+        prompt="Coverage target: the woman seated at the desk in <Picture 1>.",
+    )
+
+    assert len(clip.tokenize_calls[0][1]["minimax_ref_items"]) == 1
+    assert len(vae.encoded) == 1
+    assert [item["resolved_frame_index"] for item in conditioning[0][1]["minimax_keyframes"]] == [0]
+    assert prompt.startswith(
+        "For the target video, at 0.00 seconds into the target video, "
+        "<Picture 1> (from [Shot 1]) is fully referenced."
+    )
+    assert "integrated_multimodal_description: [Shot 1]" in prompt
+    assert "Coverage-target assignment: Coverage target: the woman seated at the desk" in prompt
+    assert "[Shot 2] At 00:00.333, the shot cuts instantly to" in prompt
+    assert "[Shot 8]" in prompt
+    assert "Their angular coordinates specify only discrete camera placements" in prompt
+    assert "Never render an orbit, pan, truck, dolly, zoom" in prompt
+    assert latent["h3edit_scene_capture_centers"] == (0, 15, 31, 46, 62, 77, 92, 108)
+    assert latent["h3edit_scene_loop_closure"] is False
+    assert OPTION_MODE_SCENE_CUTS in info
+
+
+def test_semantic_cinematic_cuts_create_then_freeze_a_new_scene():
+    options = _options(OPTION_MODE_SCENE_CUTS)
+    clip, vae, (conditioning, latent, _fitted, prompt, _info) = _encode(
+        REFERENCE_NONE,
+        options=options,
+        primary_image_role=PRIMARY_SEMANTIC_REFERENCE,
+        prompt="Create a new hotel lobby. Coverage target: the brass sculpture in the center.",
+    )
+
+    assert len(clip.tokenize_calls[0][1]["minimax_ref_items"]) == 1
+    assert len(vae.encoded) == 0
+    assert "minimax_keyframes" not in conditioning[0][1]
+    assert "minimax_refs" not in conditioning[0][1]
+    assert prompt.startswith("subject_definitions:\n<Subject 1> is one completely new, coherent physical scene")
+    assert "summary:\n[reference generation]" in prompt
+    assert "detailed_description:" in prompt
+    assert "[Shot 1]" in prompt and "[Shot 8]" in prompt
+    assert "no input picture is a source frame, composition anchor, or timeline keyframe" in prompt
+    assert latent["h3edit_scene_loop_closure"] is False
+
+
 def test_semantic_scene_coverage_generates_a_brand_new_room_without_vae_anchor():
     semantic_stack, _ = AddH3EditReference().add(
         image=_image(height=600, width=900),
@@ -578,7 +639,7 @@ def test_scene_mode_and_scene_profile_must_be_selected_together():
             prompt_mode=PROMPT_SCENE_COVERAGE,
             quality_profile=QUALITY_RECOMMENDED,
         )
-    with pytest.raises(ValueError, match=r"require 'directed \| frozen scene coverage"):
+    with pytest.raises(ValueError, match="require a frozen scene-coverage prompt mode"):
         _encode(
             REFERENCE_NONE,
             prompt_mode=PROMPT_EDIT,

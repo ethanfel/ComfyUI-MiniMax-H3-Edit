@@ -7,6 +7,7 @@ assert.match(source, /LEGACY_OPTION_WIDGETS/);
 assert.match(source, /optionsConnected/);
 assert.match(source, /LEGACY_OPTION_WIDGETS\.has\(item\.name\)\) setWidgetVisible\(item, false\)/);
 assert.match(source, /show_overrides/);
+assert.match(source, /scene coverage \| cinematic hard cuts/);
 assert.match(source, /expanded && scene/);
 assert.match(source, /computeSize = \(\) => \[0, -4\]/);
 

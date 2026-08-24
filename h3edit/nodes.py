@@ -75,9 +75,11 @@ PROMPT_REPOSE = "directed | re-pose character"
 PROMPT_CHARACTER_SWAP = "directed | character swap"
 PROMPT_NEW_ANGLE = "directed | new camera angle"
 PROMPT_SCENE_COVERAGE = "directed | frozen scene coverage"
+PROMPT_SCENE_CUTS = "directed | frozen cinematic cuts"
 PROMPT_VERBATIM = "use prompt verbatim"
 DIRECTED_PROMPT_MODES = [PROMPT_REPOSE, PROMPT_CHARACTER_SWAP, PROMPT_NEW_ANGLE]
-PROMPT_MODES = [PROMPT_EDIT, *DIRECTED_PROMPT_MODES, PROMPT_SCENE_COVERAGE, PROMPT_VERBATIM]
+SCENE_PROMPT_MODES = [PROMPT_SCENE_COVERAGE, PROMPT_SCENE_CUTS]
+PROMPT_MODES = [PROMPT_EDIT, *DIRECTED_PROMPT_MODES, *SCENE_PROMPT_MODES, PROMPT_VERBATIM]
 
 OPTION_MODE_STILL = "still | edit or generate"
 OPTION_MODE_REPOSE = "directed | re-pose character"
@@ -85,6 +87,7 @@ OPTION_MODE_CHARACTER_SWAP = "directed | character swap"
 OPTION_MODE_NEW_ANGLE = "directed | new camera angle"
 OPTION_MODE_CHARACTER_SHEET = "character sheet | canonical 6 views"
 OPTION_MODE_SCENE_COVERAGE = "scene coverage | canonical camera path"
+OPTION_MODE_SCENE_CUTS = "scene coverage | cinematic hard cuts"
 OPTION_MODE_VERBATIM = "advanced | prompt verbatim"
 OPTION_PROFILE_CANONICAL = "canonical for selected mode"
 EDIT_OPTION_PRESETS = {
@@ -94,6 +97,7 @@ EDIT_OPTION_PRESETS = {
     OPTION_MODE_NEW_ANGLE: (PROMPT_NEW_ANGLE, QUALITY_DIRECTED_CHANGE),
     OPTION_MODE_CHARACTER_SHEET: (PROMPT_EDIT, QUALITY_CHARACTER_SIX),
     OPTION_MODE_SCENE_COVERAGE: (PROMPT_SCENE_COVERAGE, QUALITY_SCENE_SHORT),
+    OPTION_MODE_SCENE_CUTS: (PROMPT_SCENE_CUTS, QUALITY_SCENE_SHORT),
     OPTION_MODE_VERBATIM: (PROMPT_VERBATIM, None),
 }
 STILL_QUALITY_PROFILES = [
@@ -453,6 +457,122 @@ def _build_scene_coverage_prompt(
     )
 
 
+def _build_scene_cut_prompt(
+    prompt: str,
+    reference_modes: list[str],
+    frame_count: int,
+    direction: str,
+    capture_plan: dict[str, Any],
+    anchored_scene: bool,
+) -> str:
+    """Build discrete, static cinematic shots around a user-designated scene target."""
+    duration = frame_count / FPS
+    direction_word = "clockwise" if direction == SCENE_DIRECTION_CLOCKWISE else "counterclockwise"
+    origin_view = "source viewpoint" if anchored_scene else "generated opening viewpoint"
+    target_assignment = prompt or "Coverage target: the primary person or object at the visual center of the scene."
+    setups = (
+        "a wide establishing composition at eye level with a 32 mm lens",
+        "a medium-wide three-quarter composition at eye level with a 40 mm lens",
+        "a medium profile composition at eye level with a 65 mm lens",
+        "a low-angle three-quarter composition with a 35 mm lens",
+        "a reverse wide composition at eye level with a 32 mm lens",
+        "a slightly high-angle three-quarter composition with a 50 mm lens",
+        "a tight profile or detail composition with an 85 mm lens",
+        "a medium three-quarter hero composition at eye level with a 50 mm lens",
+    )
+    centers = capture_plan["centers"]
+    cut_frames = [0]
+    cut_frames.extend(round((left + right) / 2) for left, right in zip(centers, centers[1:], strict=False))
+    shot_records = []
+    for index, (angle, center, window) in enumerate(
+        zip(capture_plan["angles"], centers, capture_plan["windows"], strict=True)
+    ):
+        shot_number = index + 1
+        start, end = window
+        if index == 0:
+            shot_open = "[Shot 1] Live-action or source-matched imagery. "
+            if anchored_scene:
+                setup = (
+                    "The shot begins from the exact pixels, camera placement, lens, framing, and composition of "
+                    "<Picture 1>"
+                )
+            else:
+                setup = f"The generated scene opens in {setups[0]}"
+        else:
+            cut_time = _format_h3_time(cut_frames[index])
+            shot_open = f"[Shot {shot_number}] At {cut_time}, the shot cuts instantly to "
+            setup = setups[index % len(setups)]
+        camera_position = (
+            f"a discrete camera placement {angle:g} degrees {direction_word} from the {origin_view}, with the optical "
+            "axis aimed precisely at the designated coverage target"
+        )
+        capture = (
+            f"The camera is completely static for the entire shot; extraction capture {shot_number} is centered at "
+            f"{_format_h3_time(center)} and its guaranteed motionless window runs from {_format_h3_time(start)} through "
+            f"{_format_h3_time(end)}."
+        )
+        if index == 0:
+            shot_records.append(f"{shot_open}{setup}, using {camera_position}. {capture}")
+        else:
+            shot_records.append(f"{shot_open}{setup}, already settled at {camera_position}. {capture}")
+
+    cut_contract = (
+        f"Coverage-target assignment: {target_assignment} Resolve that wording to one specific visible person, object, "
+        "architectural feature, or declared point in world space and keep the exact same target point for every shot. "
+        f"Across the {duration:.2f}-second timeline, the {capture_plan['view_count']} viewpoints are separate editorial "
+        "shots distributed across a "
+        f"{capture_plan['arc_degrees']:g}-degree {direction_word} coverage arc. Their angular coordinates specify only "
+        "discrete camera placements; they never describe camera travel. Every cut is a true instantaneous hard cut: the "
+        "first frame after the cut is already the fully resolved new perspective. Never render an orbit, pan, truck, "
+        "dolly, zoom, whip-pan, blur, dissolve, morph, or intermediate camera position between shots. Across every cut, "
+        "preserve one rigid frozen world coordinate system. Every person keeps the identical pose, expression, gaze, "
+        "hand position, hair strand, and garment fold; every object, wall, opening, fixture, material, light source, "
+        "shadow caster, and reflection source remains fixed. Only camera position, camera height, focal length, and "
+        "framing may change as explicitly declared by each shot. Perspective, parallax, occlusion, and view-dependent "
+        "reflections change only as physically required by that new camera. Newly revealed surfaces are conservative, "
+        "geometrically coherent continuations constrained by every available view. "
+    )
+    shots = " ".join(shot_records)
+    first_shot_marker = "[Shot 1] Live-action or source-matched imagery. "
+
+    if not anchored_scene:
+        picture_contract = _scene_generation_contract(reference_modes)
+        cinematic_shots = shots.replace(first_shot_marker, f"{first_shot_marker}{cut_contract}", 1)
+        return (
+            "subject_definitions:\n"
+            "<Subject 1> is one completely new, coherent physical scene generated from the ordered reference pictures. "
+            f"Its designated cinematic coverage target and design assignment are: {target_assignment}\n"
+            f"{picture_contract}\n\n"
+            "summary:\n"
+            f"[reference generation] The target creates <Subject 1>, freezes it completely, and records "
+            f"{capture_plan['view_count']} exact cinematic viewpoints as static shots separated only by hard cuts.\n\n"
+            "retention_analysis:\n"
+            "<Subject 1> (appears in every shot): fully_preserved - preserve the generated scene, designated target, "
+            "architecture, people, objects, materials, lighting, and world-space relationships without drift while the "
+            "camera cuts among discrete viewpoints.\n\n"
+            "detailed_description:\n"
+            "The target uses the requested source-matched or photorealistic visual style with crisp detail and stable "
+            "world-space lighting. First resolve all assigned reference aspects into one new scene; no input picture is "
+            "a source frame, composition anchor, or timeline keyframe. "
+            f"{cinematic_shots}\n\n"
+            "overall_soundscape:\nN/A\n\n"
+            "non_diegetic_music:\nN/A"
+        )
+
+    references = _scene_reference_contract(reference_modes, 2)
+    anchored_context = (
+        f"{cut_contract}<Picture 1> establishes the exact scene, target identity, people, objects, environment, geometry, "
+        f"materials, colors, exposure, shadows, and lighting. {references} "
+    )
+    cinematic_shots = shots.replace(first_shot_marker, f"{first_shot_marker}{anchored_context}", 1)
+    return (
+        "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\n"
+        f"integrated_multimodal_description: {cinematic_shots}\n\n"
+        "overall_soundscape: N/A\n\n"
+        "non_diegetic_music: N/A"
+    )
+
+
 def _build_character_sheet_prompt(
     prompt: str,
     reference_modes: list[str],
@@ -610,7 +730,7 @@ def _build_prompt(
     if prompt_mode == PROMPT_VERBATIM:
         return prompt
 
-    if prompt_mode == PROMPT_SCENE_COVERAGE:
+    if prompt_mode in SCENE_PROMPT_MODES:
         if scene_capture_plan is None:
             raise ValueError("Frozen scene coverage requires a camera capture plan.")
         anchored_scene = primary_image_role == PRIMARY_EDIT_ANCHOR
@@ -621,6 +741,15 @@ def _build_prompt(
                 REFERENCE_SEMANTIC if primary_image_role == PRIMARY_SEMANTIC_REFERENCE else REFERENCE_NATIVE
             )
             picture_modes = [primary_transport, *reference_modes]
+        if prompt_mode == PROMPT_SCENE_CUTS:
+            return _build_scene_cut_prompt(
+                prompt,
+                picture_modes,
+                frame_count,
+                scene_direction,
+                scene_capture_plan,
+                anchored_scene,
+            )
         return _build_scene_coverage_prompt(
             prompt,
             picture_modes,
@@ -1024,6 +1153,7 @@ class H3EditOptions:
                 OPTION_MODE_VERBATIM: set(STILL_QUALITY_PROFILES),
                 OPTION_MODE_CHARACTER_SHEET: {QUALITY_CHARACTER_FOUR, QUALITY_CHARACTER_SIX},
                 OPTION_MODE_SCENE_COVERAGE: set(SCENE_COVERAGE_PROFILES),
+                OPTION_MODE_SCENE_CUTS: set(SCENE_COVERAGE_PROFILES),
             }.get(mode, {QUALITY_DIRECTED_CHANGE})
             if profile_override not in compatible_profiles:
                 raise ValueError(
@@ -1036,11 +1166,11 @@ class H3EditOptions:
             source_fit = "crop center"
             semantic_resolution = 1024
             native_reference_size = NATIVE_SIZE_MATCH
-            coverage_views = 12
+            coverage_views = 8 if mode == OPTION_MODE_SCENE_CUTS else 12
             coverage_arc_degrees = 360.0
             coverage_direction = SCENE_DIRECTION_CLOCKWISE
             coverage_hold_frames = 5
-            coverage_loop_closure = True
+            coverage_loop_closure = mode != OPTION_MODE_SCENE_CUTS
         return (
             {
                 "mode": mode,
@@ -1313,7 +1443,8 @@ class TextEncodeH3Edit:
         if quality_profile not in QUALITY_PROFILES:
             raise ValueError(f"Unknown quality_profile: {quality_profile}")
         directed_task = prompt_mode in DIRECTED_PROMPT_MODES
-        scene_task = prompt_mode == PROMPT_SCENE_COVERAGE
+        scene_task = prompt_mode in SCENE_PROMPT_MODES
+        cinematic_cut_task = prompt_mode == PROMPT_SCENE_CUTS
         scene_profile = quality_profile in SCENE_COVERAGE_PROFILES
         if directed_task and primary_image_role != PRIMARY_EDIT_ANCHOR:
             raise ValueError("Directed re-pose, character-swap, and camera-angle tasks require the strong Picture 1 anchor.")
@@ -1322,7 +1453,7 @@ class TextEncodeH3Edit:
         if scene_task and not scene_profile:
             raise ValueError("Frozen scene coverage requires a 'scene coverage | ... camera path' quality profile.")
         if scene_profile and not scene_task:
-            raise ValueError("Scene-coverage quality profiles require 'directed | frozen scene coverage' prompt mode.")
+            raise ValueError("Scene-coverage quality profiles require a frozen scene-coverage prompt mode.")
         if coverage_direction not in SCENE_DIRECTIONS:
             raise ValueError(f"Unknown coverage direction: {coverage_direction}")
         coverage_views = max(2, min(24, int(coverage_views)))
@@ -1340,6 +1471,7 @@ class TextEncodeH3Edit:
         scene_loop_closure = bool(
             scene_task
             and anchored_edit
+            and not cinematic_cut_task
             and coverage_loop_closure
             and math.isclose(coverage_arc_degrees, 360.0, abs_tol=0.001)
         )
