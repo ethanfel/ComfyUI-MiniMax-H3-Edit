@@ -410,7 +410,11 @@ def _room_object_generation_contract(reference_modes: list[str]) -> str:
             "timeline keyframe."
         )
     return " ".join(records) + (
-        " Treat the ordered pictures as complementary survey evidence, not separate room designs. Regenerate the room "
+        " Treat the ordered pictures as complementary survey evidence with equal semantic authority, not separate room "
+        "designs. No picture is the master, source, pixel anchor, composition anchor, or timeline frame, and Picture 1 "
+        "has no priority merely because it is listed first. Reconcile repeated evidence "
+        "across all views; when observations conflict, prefer cross-view consensus and use the clearest local view only "
+        "for the detail it actually reveals. Regenerate the room "
         "and object cleanly while preserving their recognizable identity and ordinary physical character; discard source "
         "blur, noise, compression, clipped highlights, color casts, lens distortion, and accidental cropping."
     )
@@ -1368,6 +1372,7 @@ class H3EditOptions:
         }
         if mode == OPTION_MODE_ROOM_OBJECT_STUDY:
             result["primary_image_role"] = PRIMARY_SEMANTIC_REFERENCE
+            result["reference_mode"] = REFERENCE_SEMANTIC
         return (result,)
 
 
@@ -1614,6 +1619,15 @@ class TextEncodeH3Edit:
             coverage_hold_frames = int(options.get("coverage_hold_frames", coverage_hold_frames))
             coverage_loop_closure = bool(options.get("coverage_loop_closure", coverage_loop_closure))
 
+        semantic_survey_task = prompt_mode == PROMPT_ROOM_OBJECT_STUDY
+        if semantic_survey_task:
+            # Room/object study is deliberately an all-semantic reconstruction.
+            # Preserve a disconnected direct-reference socket, but coerce every
+            # connected picture away from native/VAE transport.
+            primary_image_role = PRIMARY_SEMANTIC_REFERENCE
+            if reference_mode != REFERENCE_NONE:
+                reference_mode = REFERENCE_SEMANTIC
+
         if reference_mode not in REFERENCE_MODES:
             raise ValueError(f"Unknown reference_mode: {reference_mode}")
         if primary_image_role not in PRIMARY_IMAGE_ROLES:
@@ -1713,7 +1727,7 @@ class TextEncodeH3Edit:
                 reference_specs.append(
                     {
                         "image": _validate_image(item.get("image"), f"reference_stack[{stack_index}].image"),
-                        "transport": transport,
+                        "transport": REFERENCE_SEMANTIC if semantic_survey_task else transport,
                         "semantic_resolution": int(item.get("semantic_resolution", semantic_resolution)),
                         "native_reference_size": size_mode,
                     }

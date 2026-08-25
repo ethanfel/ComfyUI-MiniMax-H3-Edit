@@ -26,6 +26,8 @@ def test_semantic_room_object_workflow_is_complete_and_self_documenting():
     assert encoder["widgets_values"][1] == "generate | semantic Picture 1 (FL2VA)"
     assert encoder["widgets_values"][3:5] == [1344, 768]
     assert "<Picture 1> through <Picture 7>" in encoder["widgets_values"][0]
+    assert "equal semantic evidence" in encoder["widgets_values"][0]
+    assert "No picture is a master reference" in encoder["widgets_values"][0]
     assert "cream/off-white leather or vinyl cube ottoman" in encoder["widgets_values"][0]
     assert "The cube never spins, yaws, turns, or pivots" in encoder["widgets_values"][0]
     assert "roughly 25 to 45 percent of the image" in encoder["widgets_values"][0]

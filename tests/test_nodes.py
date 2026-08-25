@@ -623,7 +623,9 @@ def test_semantic_room_object_study_keeps_context_and_prevents_target_rotation()
     for index in range(6):
         reference_stack, _ = builder.add(
             image=_image(height=360 + index * 8, width=640 + index * 8),
-            transport=REFERENCE_SEMANTIC,
+            # The canonical task must coerce even a stale native stack value
+            # back to semantic Qwen-only transport.
+            transport=REFERENCE_NATIVE if index == 5 else REFERENCE_SEMANTIC,
             semantic_resolution=1024,
             native_reference_size=NATIVE_SIZE_MATCH,
             previous_references=reference_stack,
@@ -647,7 +649,9 @@ def test_semantic_room_object_study_keeps_context_and_prevents_target_rotation()
         "subject_definitions:\n<Subject 1> is one completely new, coherent photorealistic reconstruction"
     )
     assert "<Subject 2> is the one exact target object" in prompt
-    assert "complementary survey evidence, not separate room designs" in prompt
+    assert "complementary survey evidence with equal semantic authority" in prompt
+    assert "No picture is the master, source, pixel anchor, composition anchor, or timeline frame" in prompt
+    assert "Picture 1 has no priority merely because it is listed first" in prompt
     assert "The first 6 shots establish the complete room" in prompt
     assert "remaining 10 shots form a dense multi-height, multi-distance study" in prompt
     assert "[Shot 16]" in prompt
@@ -666,6 +670,7 @@ def test_semantic_room_object_study_keeps_context_and_prevents_target_rotation()
     )
     assert latent["h3edit_scene_loop_closure"] is False
     assert OPTION_MODE_ROOM_OBJECT_STUDY in info
+    assert "Semantic=7; native=0" in info
 
 
 def test_semantic_scene_coverage_generates_a_brand_new_room_without_vae_anchor():
