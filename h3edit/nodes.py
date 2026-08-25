@@ -328,7 +328,7 @@ def _room_object_capture_plan(
     plan = _scene_capture_plan(frame_count, view_count, arc_degrees, hold_frames)
     view_count = plan["view_count"]
     arc_degrees = plan["arc_degrees"]
-    room_view_count = max(1, min(5, round(view_count * 0.25)))
+    room_view_count = max(1, min(8, round(view_count * 0.375)))
     object_view_count = view_count - room_view_count
     full_orbit = plan["full_orbit"]
 
@@ -337,10 +337,10 @@ def _room_object_capture_plan(
             return []
         if full_orbit:
             offset = 0.5 if half_step else 0.0
-            return [arc_degrees * ((index + offset) / count) for index in range(count)]
+            return [round(arc_degrees * ((index + offset) / count), 6) for index in range(count)]
         if count == 1:
             return [arc_degrees / 2 if half_step else 0.0]
-        return [arc_degrees * index / (count - 1) for index in range(count)]
+        return [round(arc_degrees * index / (count - 1), 6) for index in range(count)]
 
     plan["room_view_count"] = room_view_count
     plan["object_view_count"] = object_view_count
@@ -539,27 +539,28 @@ def _build_scene_cut_prompt(
             "a slightly high-angle room overview with a 32 mm lens",
             "a low eye-level room composition from a distinct corner or opening with a 35 mm lens",
             "a balanced wide composition that resolves the target object's position against the room with a 35 mm lens",
+            "a lateral medium-wide composition that resolves the target, rug, furniture, and opposite wall with a 40 mm lens",
         )
         object_setups = (
-            "an object-dominant environmental medium composition at object height with a 50 mm lens",
-            "a medium-close three-quarter object composition at object height with a 65 mm lens",
-            "a tight side-detail object composition at object height with an 85 mm lens",
-            "a low-angle object-corner composition with a 50 mm lens",
-            "a low profile object composition with a 65 mm lens",
-            "an eye-level construction-detail composition with an 85 mm lens",
-            "a slightly elevated three-quarter object composition with a 65 mm lens",
-            "a high-angle top-surface and footprint composition with a 65 mm lens",
-            "an opposite high three-quarter object composition with a 50 mm lens",
-            "an extreme material, seam, edge, or joinery detail with a 100 mm macro lens",
-            "a low material and contact-point detail with a 100 mm macro lens",
-            "a final object-dominant environmental hero composition with a 50 mm lens",
-            "a tight opposite-side object detail with an 85 mm lens",
-            "a floor-level object silhouette composition with a 50 mm lens",
-            "an overhead object geometry composition with a 65 mm lens",
-            "a close three-quarter object composition emphasizing depth with an 85 mm lens",
+            "a contextual object-height three-quarter composition with a 40 mm lens",
+            "an opposite contextual three-quarter composition at object height with a 50 mm lens",
+            "a contextual side composition preserving the rug and far wall with a 50 mm lens",
+            "a low environmental object-corner composition with a 35 mm lens",
+            "a low contextual profile composition preserving the floor and doorway with a 50 mm lens",
+            "an eye-level construction-aware medium composition with a 65 mm lens",
+            "a slightly elevated environmental three-quarter composition with a 50 mm lens",
+            "a high-angle top-surface and rug-footprint composition with a 50 mm lens",
+            "an opposite high three-quarter environmental composition with a 50 mm lens",
+            "a contextual seam and material study with a 65 mm lens while room landmarks remain visible",
+            "a low contextual contact-point study with a 50 mm lens while floorboards and furniture remain visible",
+            "a balanced room-and-object hero composition at eye level with a 40 mm lens",
+            "an opposite-side contextual object study with a 65 mm lens",
+            "a floor-level environmental silhouette composition with a 40 mm lens",
+            "an elevated object-geometry composition that retains surrounding architecture with a 50 mm lens",
+            "a contextual three-quarter composition emphasizing object depth and room parallax with a 65 mm lens",
             "an environmental medium composition revealing the nearest wall relationship with a 50 mm lens",
             "an environmental medium composition revealing the opposite wall relationship with a 50 mm lens",
-            "a close object construction study with a 100 mm macro lens",
+            "a construction study that preserves the rug, floor, and one complete architectural opening with a 65 mm lens",
             "a final balanced room-and-object composition at eye level with a 40 mm lens",
         )
     else:
@@ -615,9 +616,10 @@ def _build_scene_cut_prompt(
                 )
             else:
                 phase = (
-                    " This object-study shot makes the exact target object dominant and resolves its dimensions, "
-                    "silhouette, construction, material, seams or joinery, surface wear, and contact with the floor "
-                    "without moving or redesigning it."
+                    " This contextual object-study shot keeps the exact target at roughly 25 to 45 percent of the frame, "
+                    "with its complete silhouette, the surrounding rug or floor, and at least two recognizable room "
+                    "anchors visible. Resolve its dimensions, construction, material, seams or joinery, surface wear, "
+                    "and contact with the floor without moving, rotating, or redesigning it."
                 )
         capture = (
             f"{phase} The camera is completely static for the entire shot; extraction capture {shot_number} is centered at "
@@ -635,9 +637,15 @@ def _build_scene_cut_prompt(
     study_contract = (
         f"The first {capture_plan['room_view_count']} shots establish the complete room from separated viewpoints; the "
         f"remaining {capture_plan['object_view_count']} shots form a dense multi-height, multi-distance study of the same "
-        "target object. Keep that object visible in every room survey. Never replace it with a similar object, alter its "
-        "dimensions, rotate it, move it, clean it up independently, change its upholstery or construction, change seams "
-        "or joinery, or detach it from its fixed floor position. "
+        "target object while retaining clear room context. Keep that object visible in every room survey. In every object "
+        "study, the target occupies roughly 25 to 45 percent of the frame; show its complete silhouette, its rug or floor "
+        "contact, and at least two stable architectural or furniture anchors. Never use an isolated product shot, extreme "
+        "close-up, macro-only crop, blank background, or composition that removes the room. The target is bolted to one "
+        "world-space orientation: the same faces remain aimed toward the same doors, windows, walls, floorboards, and rug "
+        "fibers in every shot. The camera cuts around the stationary target; the target never spins, yaws, turns, pivots, "
+        "or behaves like a turntable product. Background parallax and changing occlusion must prove that the camera changed "
+        "position. Never replace the target with a similar object, alter its dimensions, move it, clean it up independently, "
+        "change its upholstery or construction, change seams or joinery, or detach it from its fixed floor position. "
         if object_study else ""
     )
     cut_contract = (
@@ -672,7 +680,7 @@ def _build_scene_cut_prompt(
             summary = (
                 f"[reference generation] The target reconstructs <Subject 1> and <Subject 2>, freezes their shared world "
                 f"completely, then records {capture_plan['room_view_count']} room-establishing shots and "
-                f"{capture_plan['object_view_count']} close object-study shots separated only by exact hard cuts."
+                f"{capture_plan['object_view_count']} contextual object-study shots separated only by exact hard cuts."
             )
             retention = (
                 "<Subject 1> (appears in every shot): fully_preserved - preserve the regenerated architecture, dimensions, "

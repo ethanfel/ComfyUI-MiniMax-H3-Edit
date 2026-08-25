@@ -617,7 +617,7 @@ def test_semantic_cinematic_cuts_create_then_freeze_a_new_scene():
     assert latent["h3edit_scene_loop_closure"] is False
 
 
-def test_semantic_room_object_study_reconstructs_one_room_then_captures_dense_object_views():
+def test_semantic_room_object_study_keeps_context_and_prevents_target_rotation():
     builder = AddH3EditReference()
     reference_stack = None
     for index in range(6):
@@ -648,16 +648,21 @@ def test_semantic_room_object_study_reconstructs_one_room_then_captures_dense_ob
     )
     assert "<Subject 2> is the one exact target object" in prompt
     assert "complementary survey evidence, not separate room designs" in prompt
-    assert "The first 4 shots establish the complete room" in prompt
-    assert "remaining 12 shots form a dense multi-height, multi-distance study" in prompt
+    assert "The first 6 shots establish the complete room" in prompt
+    assert "remaining 10 shots form a dense multi-height, multi-distance study" in prompt
     assert "[Shot 16]" in prompt
-    assert "100 mm macro lens" in prompt
+    assert "roughly 25 to 45 percent of the frame" in prompt
+    assert "at least two recognizable room anchors" in prompt
+    assert "Never use an isolated product shot, extreme close-up, macro-only crop" in prompt
+    assert "The camera cuts around the stationary target" in prompt
+    assert "never spins, yaws, turns, pivots, or behaves like a turntable product" in prompt
+    assert "100 mm macro lens" not in prompt
     assert latent["h3edit_requested_frames"] == 362
     assert len(latent["h3edit_scene_capture_centers"]) == 16
     assert latent["h3edit_scene_capture_angles"] == (
-        0.0, 90.0, 180.0, 270.0,
-        15.0, 45.0, 75.0, 105.0, 135.0, 165.0,
-        195.0, 225.0, 255.0, 285.0, 315.0, 345.0,
+        0.0, 60.0, 120.0, 180.0, 240.0, 300.0,
+        18.0, 54.0, 90.0, 126.0, 162.0,
+        198.0, 234.0, 270.0, 306.0, 342.0,
     )
     assert latent["h3edit_scene_loop_closure"] is False
     assert OPTION_MODE_ROOM_OBJECT_STUDY in info

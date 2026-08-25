@@ -27,9 +27,12 @@ def test_semantic_room_object_workflow_is_complete_and_self_documenting():
     assert encoder["widgets_values"][3:5] == [1344, 768]
     assert "<Picture 1> through <Picture 7>" in encoder["widgets_values"][0]
     assert "cream/off-white leather or vinyl cube ottoman" in encoder["widgets_values"][0]
+    assert "The cube never spins, yaws, turns, or pivots" in encoder["widgets_values"][0]
+    assert "roughly 25 to 45 percent of the image" in encoder["widgets_values"][0]
+    assert "at least two recognizable room anchors" in encoder["widgets_values"][0]
 
     note = by_type["MarkdownNote"][0]["widgets_values"][0]
-    assert "4 generated room-establishing views + 12 generated close/detail views" in note
+    assert "6 generated room-establishing views + 10 generated contextual views" in note
     assert "https://huggingface.co/PoopMan333/H3_Character_Sheet_Generator" in note
 
     link_ids = set()
