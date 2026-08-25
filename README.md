@@ -113,6 +113,8 @@ The included [directed-transformations workflow](example_workflows/H3_Directed_T
 
 `scene coverage | room + object study` is the high-accuracy semantic survey preset. It treats every ordered picture as complementary evidence of the same physical room, regenerates a clean photorealistic version instead of copying old source pixels or defects, and freezes the reconstructed world. Its canonical 362-frame packet returns 16 hard-cut stills: four separated room-establishing views followed by 12 dense views of one named physical object at varied heights, distances, and lenses, including construction, surface, seam/joinery, top, low-angle, contact-point, and environmental details. The target object remains visible in the room survey and keeps its exact dimensions, material, orientation, and floor position throughout. Selecting this preset forces Picture 1 to the semantic-generation role and leaves optional stack entries free to use semantic or native transport; compatible expert coverage overrides remain available from 2–24 views.
 
+The included [semantic room + object study workflow](example_workflows/H3_Semantic_Room_Object_Study.json) provides seven ordered Qwen-only survey inputs, the canonical 362-frame preset, a detailed Silver Estate art-studio reconstruction instruction, the scene-coverage decoder, contact-sheet and individual-view outputs, and visible credit to the original H3 character-sheet method.
+
 Example instruction:
 
 ```text

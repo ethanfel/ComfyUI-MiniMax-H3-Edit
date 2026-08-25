@@ -1,0 +1,2138 @@
+{
+  "last_node_id": 28,
+  "last_link_id": 29,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "title": "FL2VA model · semantic room generation",
+      "pos": [
+        -1900,
+        -500
+      ],
+      "size": [
+        500,
+        82
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "unet_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "unet_name"
+          },
+          "link": null
+        },
+        {
+          "name": "weight_dtype",
+          "type": "COMBO",
+          "widget": {
+            "name": "weight_dtype"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            1,
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "MiniMax-H3/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "title": "H3 Qwen3-VL",
+      "pos": [
+        -1900,
+        -370
+      ],
+      "size": [
+        500,
+        106
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "clip_name"
+          },
+          "link": null
+        },
+        {
+          "name": "type",
+          "type": "COMBO",
+          "widget": {
+            "name": "type"
+          },
+          "link": null
+        },
+        {
+          "name": "device",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "device"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "MiniMax-H3/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "minimax",
+        "default"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "title": "H3 video VAE",
+      "pos": [
+        -1900,
+        -220
+      ],
+      "size": [
+        500,
+        60
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "vae_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "vae_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            4,
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "MiniMax-H3/minimax_h3_video_vae_fp16.safetensors"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "LoadImage",
+      "title": "Picture 1 · Master room geometry",
+      "pos": [
+        -1900,
+        100
+      ],
+      "size": [
+        350,
+        360
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            6
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "silver_estate_room_01.png",
+        "image"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "title": "Picture 2 · Door wall and easels",
+      "pos": [
+        -1520,
+        100
+      ],
+      "size": [
+        350,
+        360
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            7
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "silver_estate_room_02.png",
+        "image"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "LoadImage",
+      "title": "Picture 3 · Alternate door-wall survey",
+      "pos": [
+        -1140,
+        100
+      ],
+      "size": [
+        350,
+        360
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            8
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "silver_estate_room_03.png",
+        "image"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "LoadImage",
+      "title": "Picture 4 · Rug and cube placement",
+      "pos": [
+        -760,
+        100
+      ],
+      "size": [
+        350,
+        360
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            9
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "silver_estate_room_04.png",
+        "image"
+      ]
+    },
+    {
+      "id": 8,
+      "type": "LoadImage",
+      "title": "Picture 5 · Curtain-side corner",
+      "pos": [
+        -1520,
+        800
+      ],
+      "size": [
+        350,
+        360
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            10
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "silver_estate_room_05.png",
+        "image"
+      ]
+    },
+    {
+      "id": 9,
+      "type": "LoadImage",
+      "title": "Picture 6 · Easel construction details",
+      "pos": [
+        -1140,
+        800
+      ],
+      "size": [
+        350,
+        360
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            11
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "silver_estate_room_06.png",
+        "image"
+      ]
+    },
+    {
+      "id": 10,
+      "type": "LoadImage",
+      "title": "Picture 7 · Furniture and studio props",
+      "pos": [
+        -760,
+        800
+      ],
+      "size": [
+        350,
+        360
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            12
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "silver_estate_room_07.png",
+        "image"
+      ]
+    },
+    {
+      "id": 11,
+      "type": "AddH3EditReference",
+      "title": "Picture 2 · Semantic survey",
+      "pos": [
+        -1520,
+        500
+      ],
+      "size": [
+        350,
+        190
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 7
+        },
+        {
+          "name": "transport",
+          "type": "COMBO",
+          "widget": {
+            "name": "transport"
+          },
+          "link": null
+        },
+        {
+          "name": "semantic_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "semantic_resolution"
+          },
+          "link": null
+        },
+        {
+          "name": "native_reference_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "native_reference_size"
+          },
+          "link": null
+        },
+        {
+          "name": "previous_references",
+          "shape": 7,
+          "type": "H3EDIT_REFERENCE_STACK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "references",
+          "type": "H3EDIT_REFERENCE_STACK",
+          "links": [
+            13
+          ]
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AddH3EditReference"
+      },
+      "widgets_values": [
+        "semantic (Qwen only)",
+        1024,
+        "match output area"
+      ]
+    },
+    {
+      "id": 12,
+      "type": "AddH3EditReference",
+      "title": "Picture 3 · Semantic survey",
+      "pos": [
+        -1140,
+        500
+      ],
+      "size": [
+        350,
+        190
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 8
+        },
+        {
+          "name": "transport",
+          "type": "COMBO",
+          "widget": {
+            "name": "transport"
+          },
+          "link": null
+        },
+        {
+          "name": "semantic_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "semantic_resolution"
+          },
+          "link": null
+        },
+        {
+          "name": "native_reference_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "native_reference_size"
+          },
+          "link": null
+        },
+        {
+          "name": "previous_references",
+          "shape": 7,
+          "type": "H3EDIT_REFERENCE_STACK",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "references",
+          "type": "H3EDIT_REFERENCE_STACK",
+          "links": [
+            14
+          ]
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AddH3EditReference"
+      },
+      "widgets_values": [
+        "semantic (Qwen only)",
+        1024,
+        "match output area"
+      ]
+    },
+    {
+      "id": 13,
+      "type": "AddH3EditReference",
+      "title": "Picture 4 · Semantic survey",
+      "pos": [
+        -760,
+        500
+      ],
+      "size": [
+        350,
+        190
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 9
+        },
+        {
+          "name": "transport",
+          "type": "COMBO",
+          "widget": {
+            "name": "transport"
+          },
+          "link": null
+        },
+        {
+          "name": "semantic_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "semantic_resolution"
+          },
+          "link": null
+        },
+        {
+          "name": "native_reference_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "native_reference_size"
+          },
+          "link": null
+        },
+        {
+          "name": "previous_references",
+          "shape": 7,
+          "type": "H3EDIT_REFERENCE_STACK",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "references",
+          "type": "H3EDIT_REFERENCE_STACK",
+          "links": [
+            15
+          ]
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AddH3EditReference"
+      },
+      "widgets_values": [
+        "semantic (Qwen only)",
+        1024,
+        "match output area"
+      ]
+    },
+    {
+      "id": 14,
+      "type": "AddH3EditReference",
+      "title": "Picture 5 · Semantic survey",
+      "pos": [
+        -1520,
+        1200
+      ],
+      "size": [
+        350,
+        190
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 10
+        },
+        {
+          "name": "transport",
+          "type": "COMBO",
+          "widget": {
+            "name": "transport"
+          },
+          "link": null
+        },
+        {
+          "name": "semantic_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "semantic_resolution"
+          },
+          "link": null
+        },
+        {
+          "name": "native_reference_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "native_reference_size"
+          },
+          "link": null
+        },
+        {
+          "name": "previous_references",
+          "shape": 7,
+          "type": "H3EDIT_REFERENCE_STACK",
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "references",
+          "type": "H3EDIT_REFERENCE_STACK",
+          "links": [
+            16
+          ]
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AddH3EditReference"
+      },
+      "widgets_values": [
+        "semantic (Qwen only)",
+        1024,
+        "match output area"
+      ]
+    },
+    {
+      "id": 15,
+      "type": "AddH3EditReference",
+      "title": "Picture 6 · Semantic survey",
+      "pos": [
+        -1140,
+        1200
+      ],
+      "size": [
+        350,
+        190
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 11
+        },
+        {
+          "name": "transport",
+          "type": "COMBO",
+          "widget": {
+            "name": "transport"
+          },
+          "link": null
+        },
+        {
+          "name": "semantic_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "semantic_resolution"
+          },
+          "link": null
+        },
+        {
+          "name": "native_reference_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "native_reference_size"
+          },
+          "link": null
+        },
+        {
+          "name": "previous_references",
+          "shape": 7,
+          "type": "H3EDIT_REFERENCE_STACK",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "name": "references",
+          "type": "H3EDIT_REFERENCE_STACK",
+          "links": [
+            17
+          ]
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AddH3EditReference"
+      },
+      "widgets_values": [
+        "semantic (Qwen only)",
+        1024,
+        "match output area"
+      ]
+    },
+    {
+      "id": 16,
+      "type": "AddH3EditReference",
+      "title": "Picture 7 · Semantic survey",
+      "pos": [
+        -760,
+        1200
+      ],
+      "size": [
+        350,
+        190
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 12
+        },
+        {
+          "name": "transport",
+          "type": "COMBO",
+          "widget": {
+            "name": "transport"
+          },
+          "link": null
+        },
+        {
+          "name": "semantic_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "semantic_resolution"
+          },
+          "link": null
+        },
+        {
+          "name": "native_reference_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "native_reference_size"
+          },
+          "link": null
+        },
+        {
+          "name": "previous_references",
+          "shape": 7,
+          "type": "H3EDIT_REFERENCE_STACK",
+          "link": 17
+        }
+      ],
+      "outputs": [
+        {
+          "name": "references",
+          "type": "H3EDIT_REFERENCE_STACK",
+          "links": [
+            18
+          ]
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AddH3EditReference"
+      },
+      "widgets_values": [
+        "semantic (Qwen only)",
+        1024,
+        "match output area"
+      ]
+    },
+    {
+      "id": 17,
+      "type": "H3EditOptions",
+      "title": "One choice · Room + object study",
+      "pos": [
+        -280,
+        20
+      ],
+      "size": [
+        430,
+        110
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "mode"
+          },
+          "link": null
+        },
+        {
+          "name": "show_overrides",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "show_overrides"
+          },
+          "link": null
+        },
+        {
+          "name": "profile_override",
+          "type": "COMBO",
+          "widget": {
+            "name": "profile_override"
+          },
+          "link": null
+        },
+        {
+          "name": "direct_reference_transport",
+          "type": "COMBO",
+          "widget": {
+            "name": "direct_reference_transport"
+          },
+          "link": null
+        },
+        {
+          "name": "source_fit",
+          "type": "COMBO",
+          "widget": {
+            "name": "source_fit"
+          },
+          "link": null
+        },
+        {
+          "name": "semantic_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "semantic_resolution"
+          },
+          "link": null
+        },
+        {
+          "name": "native_reference_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "native_reference_size"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_views",
+          "type": "INT",
+          "widget": {
+            "name": "coverage_views"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_arc_degrees",
+          "type": "FLOAT",
+          "widget": {
+            "name": "coverage_arc_degrees"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_direction",
+          "type": "COMBO",
+          "widget": {
+            "name": "coverage_direction"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_hold_frames",
+          "type": "INT",
+          "widget": {
+            "name": "coverage_hold_frames"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_loop_closure",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "coverage_loop_closure"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "options",
+          "type": "H3EDIT_OPTIONS",
+          "links": [
+            19
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "H3EditOptions"
+      },
+      "widgets_values": [
+        "scene coverage | room + object study",
+        false,
+        "canonical for selected mode",
+        "semantic (Qwen only)",
+        "crop center",
+        1024,
+        "match output area",
+        16,
+        360,
+        "clockwise / camera right",
+        5,
+        false
+      ]
+    },
+    {
+      "id": 18,
+      "type": "TextEncodeH3Edit",
+      "title": "Seven semantic surveys · regenerate room · study cube",
+      "pos": [
+        190,
+        0
+      ],
+      "size": [
+        720,
+        650
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 3
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 4
+        },
+        {
+          "name": "source_image",
+          "type": "IMAGE",
+          "link": 6
+        },
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "name": "primary_image_role",
+          "type": "COMBO",
+          "widget": {
+            "name": "primary_image_role"
+          },
+          "link": null
+        },
+        {
+          "name": "reference_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "reference_mode"
+          },
+          "link": null
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "widget": {
+            "name": "width"
+          },
+          "link": null
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "widget": {
+            "name": "height"
+          },
+          "link": null
+        },
+        {
+          "name": "source_fit",
+          "type": "COMBO",
+          "widget": {
+            "name": "source_fit"
+          },
+          "link": null
+        },
+        {
+          "name": "prompt_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "prompt_mode"
+          },
+          "link": null
+        },
+        {
+          "name": "semantic_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "semantic_resolution"
+          },
+          "link": null
+        },
+        {
+          "name": "native_reference_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "native_reference_size"
+          },
+          "link": null
+        },
+        {
+          "name": "reference_image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "quality_profile",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_profile"
+          },
+          "link": null
+        },
+        {
+          "name": "reference_stack",
+          "shape": 7,
+          "type": "H3EDIT_REFERENCE_STACK",
+          "link": 18
+        },
+        {
+          "name": "coverage_views",
+          "type": "INT",
+          "widget": {
+            "name": "coverage_views"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_arc_degrees",
+          "type": "FLOAT",
+          "widget": {
+            "name": "coverage_arc_degrees"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_direction",
+          "type": "COMBO",
+          "widget": {
+            "name": "coverage_direction"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_hold_frames",
+          "type": "INT",
+          "widget": {
+            "name": "coverage_hold_frames"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_loop_closure",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "coverage_loop_closure"
+          },
+          "link": null
+        },
+        {
+          "name": "options",
+          "shape": 7,
+          "type": "H3EDIT_OPTIONS",
+          "link": 19
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            20
+          ]
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            21
+          ]
+        },
+        {
+          "name": "fitted_source",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "encoded_prompt",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextEncodeH3Edit"
+      },
+      "widgets_values": [
+        "Treat <Picture 1> through <Picture 7> as complementary semantic survey views of one physical institutional art studio, never as seven designs, source frames, or compositions to copy. Use <Picture 1> as the master reference for room proportions, the long frosted-window wall, double doors and transoms, ceiling height, fluorescent fixtures, pale walls, light-brown wooden floor, gray wall board, open floor area, central dark wooden easel, cream shag rug, and cream cube ottoman. Use the remaining pictures to resolve the door wall, side windows, curtain-side corner, easel storage, furniture, rug, floor relationships, and construction details. Reconstruct one recognizable room in one coherent world coordinate system. Regenerate it as high-fidelity photorealistic architectural photography with crisp natural detail, accurate perspective, physically plausible materials, neutral color, soft daylight through frosted glass, controlled highlights, realistic global illumination, clean shadow detail, and subtle believable wear. Do not reproduce source blur, softness, compression, noise, clipped windows, color casts, exposure inconsistency, lens distortion, or accidental cropping. Target object: the exact cream/off-white leather or vinyl cube ottoman centered on the cream shag rug, with slightly rounded padded edges and its horizontal upholstery seam. Preserve its dimensions, seam placement, upholstery texture, edge shape, orientation, rug relationship, and fixed floor position. Keep it visible in every room-establishing shot, then examine that same cube from multiple close three-quarter, profile, low, high, top-surface, seam, material, contact-point, and environmental angles. Freeze the regenerated room and every object after establishment; only camera placement, height, focal length, and framing may change across instantaneous hard cuts.",
+        "generate | semantic Picture 1 (FL2VA)",
+        "none (source only)",
+        1344,
+        768,
+        "crop center",
+        "directed | room and object study cuts",
+        1024,
+        "match output area",
+        "scene coverage | 362-frame camera path",
+        16,
+        360,
+        "clockwise / camera right",
+        5,
+        false
+      ]
+    },
+    {
+      "id": 19,
+      "type": "KSamplerSelect",
+      "pos": [
+        990,
+        -250
+      ],
+      "size": [
+        360,
+        60
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "sampler_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "sampler_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SAMPLER",
+          "type": "SAMPLER",
+          "links": [
+            22
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSamplerSelect"
+      },
+      "widgets_values": [
+        "euler"
+      ]
+    },
+    {
+      "id": 20,
+      "type": "BasicScheduler",
+      "pos": [
+        990,
+        -140
+      ],
+      "size": [
+        370,
+        130
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1
+        },
+        {
+          "name": "scheduler",
+          "type": "COMBO",
+          "widget": {
+            "name": "scheduler"
+          },
+          "link": null
+        },
+        {
+          "name": "steps",
+          "type": "INT",
+          "widget": {
+            "name": "steps"
+          },
+          "link": null
+        },
+        {
+          "name": "denoise",
+          "type": "FLOAT",
+          "widget": {
+            "name": "denoise"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SIGMAS",
+          "type": "SIGMAS",
+          "links": [
+            23
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "BasicScheduler"
+      },
+      "widgets_values": [
+        "linear_quadratic",
+        25,
+        1
+      ]
+    },
+    {
+      "id": 21,
+      "type": "BasicGuider",
+      "pos": [
+        990,
+        40
+      ],
+      "size": [
+        370,
+        80
+      ],
+      "flags": {},
+      "order": 20,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 2
+        },
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 20
+        }
+      ],
+      "outputs": [
+        {
+          "name": "GUIDER",
+          "type": "GUIDER",
+          "links": [
+            24
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "BasicGuider"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 22,
+      "type": "RandomNoise",
+      "pos": [
+        990,
+        170
+      ],
+      "size": [
+        370,
+        82
+      ],
+      "flags": {},
+      "order": 21,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise_seed",
+          "type": "INT",
+          "widget": {
+            "name": "noise_seed"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "NOISE",
+          "type": "NOISE",
+          "links": [
+            25
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "RandomNoise"
+      },
+      "widgets_values": [
+        42,
+        "randomize"
+      ]
+    },
+    {
+      "id": 23,
+      "type": "SamplerCustomAdvanced",
+      "pos": [
+        1450,
+        -40
+      ],
+      "size": [
+        360,
+        180
+      ],
+      "flags": {},
+      "order": 22,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise",
+          "type": "NOISE",
+          "link": 25
+        },
+        {
+          "name": "guider",
+          "type": "GUIDER",
+          "link": 24
+        },
+        {
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 22
+        },
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 23
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 21
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "LATENT",
+          "links": [
+            26
+          ]
+        },
+        {
+          "name": "denoised_output",
+          "type": "LATENT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SamplerCustomAdvanced"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 24,
+      "type": "DecodeH3SceneCoverage",
+      "title": "Extract 4 room views + 12 cube studies",
+      "pos": [
+        1900,
+        -40
+      ],
+      "size": [
+        430,
+        180
+      ],
+      "flags": {},
+      "order": 23,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 26
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 5
+        },
+        {
+          "name": "columns",
+          "type": "INT",
+          "widget": {
+            "name": "columns"
+          },
+          "link": null
+        },
+        {
+          "name": "gutter_px",
+          "type": "INT",
+          "widget": {
+            "name": "gutter_px"
+          },
+          "link": null
+        },
+        {
+          "name": "gutter_color",
+          "type": "COMBO",
+          "widget": {
+            "name": "gutter_color"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "contact_sheet",
+          "type": "IMAGE",
+          "links": [
+            27,
+            28
+          ]
+        },
+        {
+          "name": "selected_views",
+          "type": "IMAGE",
+          "links": [
+            29
+          ]
+        },
+        {
+          "name": "all_frames",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DecodeH3SceneCoverage"
+      },
+      "widgets_values": [
+        4,
+        6,
+        "black"
+      ]
+    },
+    {
+      "id": 25,
+      "type": "PreviewImage",
+      "title": "Room + cube contact sheet",
+      "pos": [
+        2420,
+        -260
+      ],
+      "size": [
+        570,
+        520
+      ],
+      "flags": {},
+      "order": 24,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 27
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 26,
+      "type": "SaveImage",
+      "title": "Save contact sheet",
+      "pos": [
+        2420,
+        330
+      ],
+      "size": [
+        500,
+        100
+      ],
+      "flags": {},
+      "order": 25,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 28
+        },
+        {
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "H3RoomObjectStudy/%date:yyyy-MM-dd%/CONTACT_SHEET"
+      ]
+    },
+    {
+      "id": 27,
+      "type": "SaveImage",
+      "title": "Save all 16 selected views",
+      "pos": [
+        2420,
+        490
+      ],
+      "size": [
+        500,
+        100
+      ],
+      "flags": {},
+      "order": 26,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 29
+        },
+        {
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "H3RoomObjectStudy/%date:yyyy-MM-dd%/views/view"
+      ]
+    },
+    {
+      "id": 28,
+      "type": "MarkdownNote",
+      "title": "Instructions, file order, and original-method credit",
+      "pos": [
+        -1900,
+        1520
+      ],
+      "size": [
+        2510,
+        470
+      ],
+      "flags": {},
+      "order": 27,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "## Seven semantic inputs → sixteen generated outputs\n\nThe seven photographs are **inputs**, used together as complementary Qwen semantic survey evidence. The decoder returns **4 generated room-establishing views + 12 generated close/detail views of the cream cube**. No input is VAE-encoded or used as a timeline/source-frame anchor.\n\n### Silver Estate source order\n\nUpload/select the seven photographs in this order: **Picture 1 = original 3.png**, **Picture 2 = 6.png**, **Picture 3 = 1.png**, **Picture 4 = 7.png**, **Picture 5 = 2.png**, **Picture 6 = 5.png**, **Picture 7 = 4.png**. The placeholder filenames are intentionally not bundled in the repository.\n\nKeep **H3 Edit Options** on **scene coverage | room + object study**; its canonical preset forces semantic Picture 1 generation, 362 frames, 16 hard-cut captures, 360° coverage, and five-frame static extraction windows. Use the FL2VA diffusion model shown here.\n\n## Credit and inspiration\n\nThe continuous H3 camera/character-sheet method that inspired this extension was created by **C_Nugget / PoopMan333**. Their excellent original project includes workflows, prompts, examples, and usage guidance.\n\n### [Open the original H3 Character Sheet Generator on Hugging Face](https://huggingface.co/PoopMan333/H3_Character_Sheet_Generator)\n\nPlease visit and support the original creator."
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      20,
+      0,
+      "MODEL"
+    ],
+    [
+      2,
+      1,
+      0,
+      21,
+      0,
+      "MODEL"
+    ],
+    [
+      3,
+      2,
+      0,
+      18,
+      0,
+      "CLIP"
+    ],
+    [
+      4,
+      3,
+      0,
+      18,
+      1,
+      "VAE"
+    ],
+    [
+      5,
+      3,
+      0,
+      24,
+      1,
+      "VAE"
+    ],
+    [
+      6,
+      4,
+      0,
+      18,
+      2,
+      "IMAGE"
+    ],
+    [
+      7,
+      5,
+      0,
+      11,
+      0,
+      "IMAGE"
+    ],
+    [
+      8,
+      6,
+      0,
+      12,
+      0,
+      "IMAGE"
+    ],
+    [
+      9,
+      7,
+      0,
+      13,
+      0,
+      "IMAGE"
+    ],
+    [
+      10,
+      8,
+      0,
+      14,
+      0,
+      "IMAGE"
+    ],
+    [
+      11,
+      9,
+      0,
+      15,
+      0,
+      "IMAGE"
+    ],
+    [
+      12,
+      10,
+      0,
+      16,
+      0,
+      "IMAGE"
+    ],
+    [
+      13,
+      11,
+      0,
+      12,
+      4,
+      "H3EDIT_REFERENCE_STACK"
+    ],
+    [
+      14,
+      12,
+      0,
+      13,
+      4,
+      "H3EDIT_REFERENCE_STACK"
+    ],
+    [
+      15,
+      13,
+      0,
+      14,
+      4,
+      "H3EDIT_REFERENCE_STACK"
+    ],
+    [
+      16,
+      14,
+      0,
+      15,
+      4,
+      "H3EDIT_REFERENCE_STACK"
+    ],
+    [
+      17,
+      15,
+      0,
+      16,
+      4,
+      "H3EDIT_REFERENCE_STACK"
+    ],
+    [
+      18,
+      16,
+      0,
+      18,
+      14,
+      "H3EDIT_REFERENCE_STACK"
+    ],
+    [
+      19,
+      17,
+      0,
+      18,
+      20,
+      "H3EDIT_OPTIONS"
+    ],
+    [
+      20,
+      18,
+      0,
+      21,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      21,
+      18,
+      1,
+      23,
+      4,
+      "LATENT"
+    ],
+    [
+      22,
+      19,
+      0,
+      23,
+      2,
+      "SAMPLER"
+    ],
+    [
+      23,
+      20,
+      0,
+      23,
+      3,
+      "SIGMAS"
+    ],
+    [
+      24,
+      21,
+      0,
+      23,
+      1,
+      "GUIDER"
+    ],
+    [
+      25,
+      22,
+      0,
+      23,
+      0,
+      "NOISE"
+    ],
+    [
+      26,
+      23,
+      0,
+      24,
+      0,
+      "LATENT"
+    ],
+    [
+      27,
+      24,
+      0,
+      25,
+      0,
+      "IMAGE"
+    ],
+    [
+      28,
+      24,
+      0,
+      26,
+      0,
+      "IMAGE"
+    ],
+    [
+      29,
+      24,
+      1,
+      27,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1 · FL2VA, Qwen, and H3 VAE",
+      "bounding": [
+        -1940,
+        -540,
+        580,
+        440
+      ],
+      "color": "#3f789e",
+      "font_size": 22,
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2 · Seven complementary semantic room surveys",
+      "bounding": [
+        -1940,
+        50,
+        1570,
+        1400
+      ],
+      "color": "#496b8a",
+      "font_size": 22,
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "3 · One canonical mode and one room/object instruction",
+      "bounding": [
+        -330,
+        -50,
+        1280,
+        750
+      ],
+      "color": "#8f6f40",
+      "font_size": 22,
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "4 · Sample the 362-frame hard-cut packet",
+      "bounding": [
+        950,
+        -300,
+        910,
+        620
+      ],
+      "color": "#456744",
+      "font_size": 22,
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "5 · Extract, preview, and save 16 viewpoints",
+      "bounding": [
+        1860,
+        -310,
+        1190,
+        970
+      ],
+      "color": "#6f4c7a",
+      "font_size": 22,
+      "flags": {}
+    },
+    {
+      "id": 6,
+      "title": "Instructions and original-method credit",
+      "bounding": [
+        -1940,
+        1480,
+        2590,
+        550
+      ],
+      "color": "#7a5b32",
+      "font_size": 22,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.52,
+      "offset": [
+        1010,
+        430
+      ]
+    }
+  },
+  "version": 0.4
+}
