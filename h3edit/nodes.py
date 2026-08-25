@@ -76,9 +76,10 @@ PROMPT_CHARACTER_SWAP = "directed | character swap"
 PROMPT_NEW_ANGLE = "directed | new camera angle"
 PROMPT_SCENE_COVERAGE = "directed | frozen scene coverage"
 PROMPT_SCENE_CUTS = "directed | frozen cinematic cuts"
+PROMPT_ROOM_OBJECT_STUDY = "directed | room and object study cuts"
 PROMPT_VERBATIM = "use prompt verbatim"
 DIRECTED_PROMPT_MODES = [PROMPT_REPOSE, PROMPT_CHARACTER_SWAP, PROMPT_NEW_ANGLE]
-SCENE_PROMPT_MODES = [PROMPT_SCENE_COVERAGE, PROMPT_SCENE_CUTS]
+SCENE_PROMPT_MODES = [PROMPT_SCENE_COVERAGE, PROMPT_SCENE_CUTS, PROMPT_ROOM_OBJECT_STUDY]
 PROMPT_MODES = [PROMPT_EDIT, *DIRECTED_PROMPT_MODES, *SCENE_PROMPT_MODES, PROMPT_VERBATIM]
 
 OPTION_MODE_STILL = "still | edit or generate"
@@ -88,6 +89,7 @@ OPTION_MODE_NEW_ANGLE = "directed | new camera angle"
 OPTION_MODE_CHARACTER_SHEET = "character sheet | canonical 6 views"
 OPTION_MODE_SCENE_COVERAGE = "scene coverage | canonical camera path"
 OPTION_MODE_SCENE_CUTS = "scene coverage | cinematic hard cuts"
+OPTION_MODE_ROOM_OBJECT_STUDY = "scene coverage | room + object study"
 OPTION_MODE_VERBATIM = "advanced | prompt verbatim"
 OPTION_PROFILE_CANONICAL = "canonical for selected mode"
 EDIT_OPTION_PRESETS = {
@@ -98,6 +100,7 @@ EDIT_OPTION_PRESETS = {
     OPTION_MODE_CHARACTER_SHEET: (PROMPT_EDIT, QUALITY_CHARACTER_SIX),
     OPTION_MODE_SCENE_COVERAGE: (PROMPT_SCENE_COVERAGE, QUALITY_SCENE_SHORT),
     OPTION_MODE_SCENE_CUTS: (PROMPT_SCENE_CUTS, QUALITY_SCENE_SHORT),
+    OPTION_MODE_ROOM_OBJECT_STUDY: (PROMPT_ROOM_OBJECT_STUDY, QUALITY_SCENE_LONG),
     OPTION_MODE_VERBATIM: (PROMPT_VERBATIM, None),
 }
 STILL_QUALITY_PROFILES = [
@@ -315,6 +318,38 @@ def _scene_capture_plan(
     }
 
 
+def _room_object_capture_plan(
+    frame_count: int,
+    view_count: int,
+    arc_degrees: float,
+    hold_frames: int,
+) -> dict[str, Any]:
+    """Schedule a short room survey followed by denser views of one object."""
+    plan = _scene_capture_plan(frame_count, view_count, arc_degrees, hold_frames)
+    view_count = plan["view_count"]
+    arc_degrees = plan["arc_degrees"]
+    room_view_count = max(1, min(5, round(view_count * 0.25)))
+    object_view_count = view_count - room_view_count
+    full_orbit = plan["full_orbit"]
+
+    def phase_angles(count: int, *, half_step: bool = False) -> list[float]:
+        if count <= 0:
+            return []
+        if full_orbit:
+            offset = 0.5 if half_step else 0.0
+            return [arc_degrees * ((index + offset) / count) for index in range(count)]
+        if count == 1:
+            return [arc_degrees / 2 if half_step else 0.0]
+        return [arc_degrees * index / (count - 1) for index in range(count)]
+
+    plan["room_view_count"] = room_view_count
+    plan["object_view_count"] = object_view_count
+    plan["angles"] = tuple(
+        phase_angles(room_view_count) + phase_angles(object_view_count, half_step=True)
+    )
+    return plan
+
+
 def _scene_reference_contract(
     reference_modes: list[str],
     first_ordinal: int,
@@ -357,6 +392,28 @@ def _scene_generation_contract(reference_modes: list[str]) -> str:
             "source frame or timeline keyframe."
         )
     return " ".join(records)
+
+
+def _room_object_generation_contract(reference_modes: list[str]) -> str:
+    records = []
+    for ordinal, reference_mode in enumerate(reference_modes, start=1):
+        transport = (
+            "semantic Qwen-only survey reference"
+            if reference_mode == REFERENCE_SEMANTIC
+            else "native Qwen+VAE survey reference"
+        )
+        records.append(
+            f"<Picture {ordinal}> is a {transport} showing an observation of the same physical room. Where the target "
+            "object is visible, use it as evidence for that same object's appearance and fixed placement. "
+            "Use overlapping architecture, openings, fixtures, furniture, object placement, proportions, materials, and "
+            "lighting to solve one shared world coordinate system; it is not a source frame, composition anchor, or "
+            "timeline keyframe."
+        )
+    return " ".join(records) + (
+        " Treat the ordered pictures as complementary survey evidence, not separate room designs. Regenerate the room "
+        "and object cleanly while preserving their recognizable identity and ordinary physical character; discard source "
+        "blur, noise, compression, clipped highlights, color casts, lens distortion, and accidental cropping."
+    )
 
 
 def _build_scene_coverage_prompt(
@@ -464,22 +521,58 @@ def _build_scene_cut_prompt(
     direction: str,
     capture_plan: dict[str, Any],
     anchored_scene: bool,
+    object_study: bool = False,
 ) -> str:
     """Build discrete, static cinematic shots around a user-designated scene target."""
     duration = frame_count / FPS
     direction_word = "clockwise" if direction == SCENE_DIRECTION_CLOCKWISE else "counterclockwise"
     origin_view = "source viewpoint" if anchored_scene else "generated opening viewpoint"
-    target_assignment = prompt or "Coverage target: the primary person or object at the visual center of the scene."
-    setups = (
-        "a wide establishing composition at eye level with a 32 mm lens",
-        "a medium-wide three-quarter composition at eye level with a 40 mm lens",
-        "a medium profile composition at eye level with a 65 mm lens",
-        "a low-angle three-quarter composition with a 35 mm lens",
-        "a reverse wide composition at eye level with a 32 mm lens",
-        "a slightly high-angle three-quarter composition with a 50 mm lens",
-        "a tight profile or detail composition with an 85 mm lens",
-        "a medium three-quarter hero composition at eye level with a 50 mm lens",
+    target_assignment = prompt or (
+        "Target object: the primary freestanding object near the visual center of the room."
+        if object_study
+        else "Coverage target: the primary person or object at the visual center of the scene."
     )
+    if object_study:
+        room_setups = (
+            "a wide room-establishing composition at eye level with a 28 mm lens",
+            "a reverse wide room-establishing composition at eye level with a 28 mm lens",
+            "a slightly high-angle room overview with a 32 mm lens",
+            "a low eye-level room composition from a distinct corner or opening with a 35 mm lens",
+            "a balanced wide composition that resolves the target object's position against the room with a 35 mm lens",
+        )
+        object_setups = (
+            "an object-dominant environmental medium composition at object height with a 50 mm lens",
+            "a medium-close three-quarter object composition at object height with a 65 mm lens",
+            "a tight side-detail object composition at object height with an 85 mm lens",
+            "a low-angle object-corner composition with a 50 mm lens",
+            "a low profile object composition with a 65 mm lens",
+            "an eye-level construction-detail composition with an 85 mm lens",
+            "a slightly elevated three-quarter object composition with a 65 mm lens",
+            "a high-angle top-surface and footprint composition with a 65 mm lens",
+            "an opposite high three-quarter object composition with a 50 mm lens",
+            "an extreme material, seam, edge, or joinery detail with a 100 mm macro lens",
+            "a low material and contact-point detail with a 100 mm macro lens",
+            "a final object-dominant environmental hero composition with a 50 mm lens",
+            "a tight opposite-side object detail with an 85 mm lens",
+            "a floor-level object silhouette composition with a 50 mm lens",
+            "an overhead object geometry composition with a 65 mm lens",
+            "a close three-quarter object composition emphasizing depth with an 85 mm lens",
+            "an environmental medium composition revealing the nearest wall relationship with a 50 mm lens",
+            "an environmental medium composition revealing the opposite wall relationship with a 50 mm lens",
+            "a close object construction study with a 100 mm macro lens",
+            "a final balanced room-and-object composition at eye level with a 40 mm lens",
+        )
+    else:
+        setups = (
+            "a wide establishing composition at eye level with a 32 mm lens",
+            "a medium-wide three-quarter composition at eye level with a 40 mm lens",
+            "a medium profile composition at eye level with a 65 mm lens",
+            "a low-angle three-quarter composition with a 35 mm lens",
+            "a reverse wide composition at eye level with a 32 mm lens",
+            "a slightly high-angle three-quarter composition with a 50 mm lens",
+            "a tight profile or detail composition with an 85 mm lens",
+            "a medium three-quarter hero composition at eye level with a 50 mm lens",
+        )
     centers = capture_plan["centers"]
     cut_frames = [0]
     cut_frames.extend(round((left + right) / 2) for left, right in zip(centers, centers[1:], strict=False))
@@ -489,6 +582,14 @@ def _build_scene_cut_prompt(
     ):
         shot_number = index + 1
         start, end = window
+        if object_study:
+            if index < capture_plan["room_view_count"]:
+                setup = room_setups[index % len(room_setups)]
+            else:
+                object_index = index - capture_plan["room_view_count"]
+                setup = object_setups[object_index % len(object_setups)]
+        else:
+            setup = setups[index % len(setups)]
         if index == 0:
             shot_open = "[Shot 1] Live-action or source-matched imagery. "
             if anchored_scene:
@@ -497,17 +598,29 @@ def _build_scene_cut_prompt(
                     "<Picture 1>"
                 )
             else:
-                setup = f"The generated scene opens in {setups[0]}"
+                setup = f"The generated scene opens in {setup}"
         else:
             cut_time = _format_h3_time(cut_frames[index])
             shot_open = f"[Shot {shot_number}] At {cut_time}, the shot cuts instantly to "
-            setup = setups[index % len(setups)]
         camera_position = (
             f"a discrete camera placement {angle:g} degrees {direction_word} from the {origin_view}, with the optical "
             "axis aimed precisely at the designated coverage target"
         )
+        phase = ""
+        if object_study:
+            if index < capture_plan["room_view_count"]:
+                phase = (
+                    " This room-survey shot keeps the target object clearly visible in its exact architectural and "
+                    "furniture context while prioritizing room geometry and spatial relationships."
+                )
+            else:
+                phase = (
+                    " This object-study shot makes the exact target object dominant and resolves its dimensions, "
+                    "silhouette, construction, material, seams or joinery, surface wear, and contact with the floor "
+                    "without moving or redesigning it."
+                )
         capture = (
-            f"The camera is completely static for the entire shot; extraction capture {shot_number} is centered at "
+            f"{phase} The camera is completely static for the entire shot; extraction capture {shot_number} is centered at "
             f"{_format_h3_time(center)} and its guaranteed motionless window runs from {_format_h3_time(start)} through "
             f"{_format_h3_time(end)}."
         )
@@ -516,9 +629,21 @@ def _build_scene_cut_prompt(
         else:
             shot_records.append(f"{shot_open}{setup}, already settled at {camera_position}. {capture}")
 
+    target_kind = "one specific visible physical object" if object_study else (
+        "one specific visible person, object, architectural feature, or declared point in world space"
+    )
+    study_contract = (
+        f"The first {capture_plan['room_view_count']} shots establish the complete room from separated viewpoints; the "
+        f"remaining {capture_plan['object_view_count']} shots form a dense multi-height, multi-distance study of the same "
+        "target object. Keep that object visible in every room survey. Never replace it with a similar object, alter its "
+        "dimensions, rotate it, move it, clean it up independently, change its upholstery or construction, change seams "
+        "or joinery, or detach it from its fixed floor position. "
+        if object_study else ""
+    )
     cut_contract = (
-        f"Coverage-target assignment: {target_assignment} Resolve that wording to one specific visible person, object, "
-        "architectural feature, or declared point in world space and keep the exact same target point for every shot. "
+        f"Coverage-target assignment: {target_assignment} Resolve that wording to {target_kind} and keep the exact same "
+        "target point for every shot. "
+        f"{study_contract}"
         f"Across the {duration:.2f}-second timeline, the {capture_plan['view_count']} viewpoints are separate editorial "
         "shots distributed across a "
         f"{capture_plan['arc_degrees']:g}-degree {direction_word} coverage arc. Their angular coordinates specify only "
@@ -536,24 +661,64 @@ def _build_scene_cut_prompt(
     first_shot_marker = "[Shot 1] Live-action or source-matched imagery. "
 
     if not anchored_scene:
-        picture_contract = _scene_generation_contract(reference_modes)
+        if object_study:
+            picture_contract = _room_object_generation_contract(reference_modes)
+            subject_definitions = (
+                "<Subject 1> is one completely new, coherent photorealistic reconstruction of the same physical room "
+                "observed across the ordered reference pictures.\n"
+                f"<Subject 2> is the one exact target object inside <Subject 1> designated by this assignment: "
+                f"{target_assignment}\n"
+            )
+            summary = (
+                f"[reference generation] The target reconstructs <Subject 1> and <Subject 2>, freezes their shared world "
+                f"completely, then records {capture_plan['room_view_count']} room-establishing shots and "
+                f"{capture_plan['object_view_count']} close object-study shots separated only by exact hard cuts."
+            )
+            retention = (
+                "<Subject 1> (appears in every shot): fully_preserved - preserve the regenerated architecture, dimensions, "
+                "openings, fixtures, furniture, materials, lighting, and spatial relationships without drift across cuts.\n"
+                "<Subject 2> (appears in every shot): fully_preserved - preserve the target object's exact identity, "
+                "dimensions, silhouette, construction, material, seams or joinery, surface character, orientation, and "
+                "fixed position while only viewpoint, lens, height, and framing change."
+            )
+            detail_open = (
+                "The target uses high-fidelity live-action architectural photography with crisp natural detail, accurate "
+                "perspective, physically plausible materials, neutral color, controlled highlights, realistic global "
+                "illumination, clean shadow detail, and stable world-space lighting. First reconcile every ordered picture "
+                "as survey evidence of one source room, then regenerate <Subject 1> and <Subject 2> as one improved but "
+                "recognizably identical physical place. No input picture supplies source pixels or a timeline frame. "
+            )
+        else:
+            picture_contract = _scene_generation_contract(reference_modes)
+            subject_definitions = (
+                "<Subject 1> is one completely new, coherent physical scene generated from the ordered reference pictures. "
+                f"Its designated cinematic coverage target and design assignment are: {target_assignment}\n"
+            )
+            summary = (
+                f"[reference generation] The target creates <Subject 1>, freezes it completely, and records "
+                f"{capture_plan['view_count']} exact cinematic viewpoints as static shots separated only by hard cuts."
+            )
+            retention = (
+                "<Subject 1> (appears in every shot): fully_preserved - preserve the generated scene, designated target, "
+                "architecture, people, objects, materials, lighting, and world-space relationships without drift while the "
+                "camera cuts among discrete viewpoints."
+            )
+            detail_open = (
+                "The target uses the requested source-matched or photorealistic visual style with crisp detail and stable "
+                "world-space lighting. First resolve all assigned reference aspects into one new scene; no input picture is "
+                "a source frame, composition anchor, or timeline keyframe. "
+            )
         cinematic_shots = shots.replace(first_shot_marker, f"{first_shot_marker}{cut_contract}", 1)
         return (
             "subject_definitions:\n"
-            "<Subject 1> is one completely new, coherent physical scene generated from the ordered reference pictures. "
-            f"Its designated cinematic coverage target and design assignment are: {target_assignment}\n"
+            f"{subject_definitions}"
             f"{picture_contract}\n\n"
             "summary:\n"
-            f"[reference generation] The target creates <Subject 1>, freezes it completely, and records "
-            f"{capture_plan['view_count']} exact cinematic viewpoints as static shots separated only by hard cuts.\n\n"
+            f"{summary}\n\n"
             "retention_analysis:\n"
-            "<Subject 1> (appears in every shot): fully_preserved - preserve the generated scene, designated target, "
-            "architecture, people, objects, materials, lighting, and world-space relationships without drift while the "
-            "camera cuts among discrete viewpoints.\n\n"
+            f"{retention}\n\n"
             "detailed_description:\n"
-            "The target uses the requested source-matched or photorealistic visual style with crisp detail and stable "
-            "world-space lighting. First resolve all assigned reference aspects into one new scene; no input picture is "
-            "a source frame, composition anchor, or timeline keyframe. "
+            f"{detail_open}"
             f"{cinematic_shots}\n\n"
             "overall_soundscape:\nN/A\n\n"
             "non_diegetic_music:\nN/A"
@@ -741,7 +906,7 @@ def _build_prompt(
                 REFERENCE_SEMANTIC if primary_image_role == PRIMARY_SEMANTIC_REFERENCE else REFERENCE_NATIVE
             )
             picture_modes = [primary_transport, *reference_modes]
-        if prompt_mode == PROMPT_SCENE_CUTS:
+        if prompt_mode in {PROMPT_SCENE_CUTS, PROMPT_ROOM_OBJECT_STUDY}:
             return _build_scene_cut_prompt(
                 prompt,
                 picture_modes,
@@ -749,6 +914,7 @@ def _build_prompt(
                 scene_direction,
                 scene_capture_plan,
                 anchored_scene,
+                object_study=prompt_mode == PROMPT_ROOM_OBJECT_STUDY,
             )
         return _build_scene_coverage_prompt(
             prompt,
@@ -1154,6 +1320,7 @@ class H3EditOptions:
                 OPTION_MODE_CHARACTER_SHEET: {QUALITY_CHARACTER_FOUR, QUALITY_CHARACTER_SIX},
                 OPTION_MODE_SCENE_COVERAGE: set(SCENE_COVERAGE_PROFILES),
                 OPTION_MODE_SCENE_CUTS: set(SCENE_COVERAGE_PROFILES),
+                OPTION_MODE_ROOM_OBJECT_STUDY: set(SCENE_COVERAGE_PROFILES),
             }.get(mode, {QUALITY_DIRECTED_CHANGE})
             if profile_override not in compatible_profiles:
                 raise ValueError(
@@ -1166,28 +1333,34 @@ class H3EditOptions:
             source_fit = "crop center"
             semantic_resolution = 1024
             native_reference_size = NATIVE_SIZE_MATCH
-            coverage_views = 8 if mode == OPTION_MODE_SCENE_CUTS else 12
+            if mode == OPTION_MODE_ROOM_OBJECT_STUDY:
+                coverage_views = 16
+            elif mode == OPTION_MODE_SCENE_CUTS:
+                coverage_views = 8
+            else:
+                coverage_views = 12
             coverage_arc_degrees = 360.0
             coverage_direction = SCENE_DIRECTION_CLOCKWISE
             coverage_hold_frames = 5
-            coverage_loop_closure = mode != OPTION_MODE_SCENE_CUTS
-        return (
-            {
-                "mode": mode,
-                "show_overrides": overrides_enabled,
-                "prompt_mode": prompt_mode,
-                "quality_profile": quality_profile,
-                "reference_mode": direct_reference_transport,
-                "source_fit": source_fit,
-                "semantic_resolution": int(semantic_resolution),
-                "native_reference_size": native_reference_size,
-                "coverage_views": int(coverage_views),
-                "coverage_arc_degrees": float(coverage_arc_degrees),
-                "coverage_direction": coverage_direction,
-                "coverage_hold_frames": int(coverage_hold_frames),
-                "coverage_loop_closure": bool(coverage_loop_closure),
-            },
-        )
+            coverage_loop_closure = mode not in {OPTION_MODE_SCENE_CUTS, OPTION_MODE_ROOM_OBJECT_STUDY}
+        result = {
+            "mode": mode,
+            "show_overrides": overrides_enabled,
+            "prompt_mode": prompt_mode,
+            "quality_profile": quality_profile,
+            "reference_mode": direct_reference_transport,
+            "source_fit": source_fit,
+            "semantic_resolution": int(semantic_resolution),
+            "native_reference_size": native_reference_size,
+            "coverage_views": int(coverage_views),
+            "coverage_arc_degrees": float(coverage_arc_degrees),
+            "coverage_direction": coverage_direction,
+            "coverage_hold_frames": int(coverage_hold_frames),
+            "coverage_loop_closure": bool(coverage_loop_closure),
+        }
+        if mode == OPTION_MODE_ROOM_OBJECT_STUDY:
+            result["primary_image_role"] = PRIMARY_SEMANTIC_REFERENCE
+        return (result,)
 
 
 class TextEncodeH3Edit:
@@ -1422,6 +1595,7 @@ class TextEncodeH3Edit:
                 raise ValueError(f"Unknown H3 Edit option mode: {option_mode}")
             prompt_mode = str(options.get("prompt_mode", prompt_mode))
             quality_profile = str(options.get("quality_profile", quality_profile))
+            primary_image_role = str(options.get("primary_image_role", primary_image_role))
             reference_mode = str(options.get("reference_mode", reference_mode))
             source_fit = str(options.get("source_fit", source_fit))
             semantic_resolution = int(options.get("semantic_resolution", semantic_resolution))
@@ -1444,7 +1618,7 @@ class TextEncodeH3Edit:
             raise ValueError(f"Unknown quality_profile: {quality_profile}")
         directed_task = prompt_mode in DIRECTED_PROMPT_MODES
         scene_task = prompt_mode in SCENE_PROMPT_MODES
-        cinematic_cut_task = prompt_mode == PROMPT_SCENE_CUTS
+        cinematic_cut_task = prompt_mode in {PROMPT_SCENE_CUTS, PROMPT_ROOM_OBJECT_STUDY}
         scene_profile = quality_profile in SCENE_COVERAGE_PROFILES
         if directed_task and primary_image_role != PRIMARY_EDIT_ANCHOR:
             raise ValueError("Directed re-pose, character-swap, and camera-angle tasks require the strong Picture 1 anchor.")
@@ -1608,11 +1782,13 @@ class TextEncodeH3Edit:
             latent["h3edit_option_mode"] = option_mode
         scene_capture_plan = None
         if scene_task:
-            scene_capture_plan = _scene_capture_plan(
-                natural_frames,
-                coverage_views,
-                coverage_arc_degrees,
-                coverage_hold_frames,
+            capture_planner = (
+                _room_object_capture_plan
+                if prompt_mode == PROMPT_ROOM_OBJECT_STUDY
+                else _scene_capture_plan
+            )
+            scene_capture_plan = capture_planner(
+                natural_frames, coverage_views, coverage_arc_degrees, coverage_hold_frames
             )
             latent["h3edit_scene_capture_centers"] = scene_capture_plan["centers"]
             latent["h3edit_scene_capture_windows"] = scene_capture_plan["windows"]

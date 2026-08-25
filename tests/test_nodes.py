@@ -12,6 +12,7 @@ from h3edit.nodes import (
     NATIVE_SIZE_MATCH,
     OPTION_MODE_CHARACTER_SHEET,
     OPTION_MODE_REPOSE,
+    OPTION_MODE_ROOM_OBJECT_STUDY,
     OPTION_MODE_SCENE_COVERAGE,
     OPTION_MODE_SCENE_CUTS,
     OPTION_PROFILE_CANONICAL,
@@ -22,6 +23,7 @@ from h3edit.nodes import (
     PROMPT_EDIT,
     PROMPT_NEW_ANGLE,
     PROMPT_REPOSE,
+    PROMPT_ROOM_OBJECT_STUDY,
     PROMPT_SCENE_COVERAGE,
     PROMPT_SCENE_CUTS,
     PROMPT_VERBATIM,
@@ -198,6 +200,19 @@ def test_cinematic_cut_mode_sends_eight_view_hard_cut_preset():
     assert options["prompt_mode"] == PROMPT_SCENE_CUTS
     assert options["quality_profile"] == QUALITY_SCENE_SHORT
     assert options["coverage_views"] == 8
+    assert options["coverage_arc_degrees"] == 360.0
+    assert options["coverage_hold_frames"] == 5
+    assert options["coverage_loop_closure"] is False
+
+
+def test_room_object_study_mode_sends_long_sixteen_view_preset():
+    options = _options(OPTION_MODE_ROOM_OBJECT_STUDY)
+
+    assert options["prompt_mode"] == PROMPT_ROOM_OBJECT_STUDY
+    assert options["quality_profile"] == QUALITY_SCENE_LONG
+    assert options["primary_image_role"] == PRIMARY_SEMANTIC_REFERENCE
+    assert options["reference_mode"] == REFERENCE_SEMANTIC
+    assert options["coverage_views"] == 16
     assert options["coverage_arc_degrees"] == 360.0
     assert options["coverage_hold_frames"] == 5
     assert options["coverage_loop_closure"] is False
@@ -600,6 +615,52 @@ def test_semantic_cinematic_cuts_create_then_freeze_a_new_scene():
     assert "[Shot 1]" in prompt and "[Shot 8]" in prompt
     assert "no input picture is a source frame, composition anchor, or timeline keyframe" in prompt
     assert latent["h3edit_scene_loop_closure"] is False
+
+
+def test_semantic_room_object_study_reconstructs_one_room_then_captures_dense_object_views():
+    builder = AddH3EditReference()
+    reference_stack = None
+    for index in range(6):
+        reference_stack, _ = builder.add(
+            image=_image(height=360 + index * 8, width=640 + index * 8),
+            transport=REFERENCE_SEMANTIC,
+            semantic_resolution=1024,
+            native_reference_size=NATIVE_SIZE_MATCH,
+            previous_references=reference_stack,
+        )
+    options = _options(OPTION_MODE_ROOM_OBJECT_STUDY)
+    clip, vae, (conditioning, latent, _fitted, prompt, info) = _encode(
+        REFERENCE_NONE,
+        options=options,
+        reference_stack=reference_stack,
+        prompt=(
+            "Reconstruct the same art studio shown in <Picture 1> through <Picture 7>. "
+            "Target object: the cream leather cube ottoman on the shag rug."
+        ),
+    )
+
+    assert len(clip.tokenize_calls[0][1]["minimax_ref_items"]) == 7
+    assert len(vae.encoded) == 0
+    assert "minimax_keyframes" not in conditioning[0][1]
+    assert "minimax_refs" not in conditioning[0][1]
+    assert prompt.startswith(
+        "subject_definitions:\n<Subject 1> is one completely new, coherent photorealistic reconstruction"
+    )
+    assert "<Subject 2> is the one exact target object" in prompt
+    assert "complementary survey evidence, not separate room designs" in prompt
+    assert "The first 4 shots establish the complete room" in prompt
+    assert "remaining 12 shots form a dense multi-height, multi-distance study" in prompt
+    assert "[Shot 16]" in prompt
+    assert "100 mm macro lens" in prompt
+    assert latent["h3edit_requested_frames"] == 362
+    assert len(latent["h3edit_scene_capture_centers"]) == 16
+    assert latent["h3edit_scene_capture_angles"] == (
+        0.0, 90.0, 180.0, 270.0,
+        15.0, 45.0, 75.0, 105.0, 135.0, 165.0,
+        195.0, 225.0, 255.0, 285.0, 315.0, 345.0,
+    )
+    assert latent["h3edit_scene_loop_closure"] is False
+    assert OPTION_MODE_ROOM_OBJECT_STUDY in info
 
 
 def test_semantic_scene_coverage_generates_a_brand_new_room_without_vae_anchor():

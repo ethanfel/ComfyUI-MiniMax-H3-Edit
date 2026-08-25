@@ -5,6 +5,7 @@ const OPTIONS_NODE = "H3EditOptions";
 const SCENE_MODES = new Set([
     "scene coverage | canonical camera path",
     "scene coverage | cinematic hard cuts",
+    "scene coverage | room + object study",
 ]);
 const LEGACY_OPTION_WIDGETS = new Set([
     "reference_mode",
