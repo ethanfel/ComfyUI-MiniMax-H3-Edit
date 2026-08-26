@@ -1383,7 +1383,8 @@ class TextEncodeH3Edit:
         "Switch Picture 1 between a strong FL2VA source anchor, a semantic FL2VA generation reference, or a native "
         "REF2VA generation reference. Additional ordered guides independently use Qwen-only semantic or native "
         "Qwen+VAE transport. It also compiles frozen-scene camera coverage from one anchored room or semantic/native "
-        "references for a completely new room."
+        "references for a completely new room. An optional compiled_prompt input lets an external compiler profile "
+        "replace only the built-in prompt construction while preserving the authoring prompt and conditioning graph."
     )
 
     @classmethod
@@ -1558,6 +1559,18 @@ class TextEncodeH3Edit:
                         )
                     },
                 ),
+                "compiled_prompt": (
+                    "STRING",
+                    {
+                        "forceInput": True,
+                        "tooltip": (
+                            "Optional complete H3 prompt from an external compiler profile. When connected, this "
+                            "bypasses only the built-in prompt compiler; the prompt widget remains unchanged, and "
+                            "reference images, Qwen ordering, latent timing, and decoder metadata are still prepared "
+                            "by this encoder. The connected text must already be a complete H3 prompt."
+                        ),
+                    },
+                ),
             },
         }
 
@@ -1596,6 +1609,7 @@ class TextEncodeH3Edit:
         coverage_hold_frames: int = 5,
         coverage_loop_closure: bool = True,
         options: dict[str, Any] | None = None,
+        compiled_prompt: str | None = None,
     ):
         import node_helpers
 
@@ -1824,16 +1838,22 @@ class TextEncodeH3Edit:
         additional_modes = [item["transport"] for item in reference_specs]
         if not anchored_edit:
             additional_modes = additional_modes[1:]
-        encoded_prompt = _build_prompt(
-            prompt,
-            prompt_mode,
-            additional_modes,
-            requested_frames,
-            primary_image_role,
-            scene_capture_plan=scene_capture_plan,
-            scene_direction=coverage_direction,
-            scene_loop_closure=scene_loop_closure,
-        )
+        external_compiler = compiled_prompt is not None
+        if external_compiler:
+            encoded_prompt = str(compiled_prompt).strip()
+            if not encoded_prompt:
+                raise ValueError("The connected compiled_prompt is empty; connect a complete H3 prompt or disconnect it.")
+        else:
+            encoded_prompt = _build_prompt(
+                prompt,
+                prompt_mode,
+                additional_modes,
+                requested_frames,
+                primary_image_role,
+                scene_capture_plan=scene_capture_plan,
+                scene_direction=coverage_direction,
+                scene_loop_closure=scene_loop_closure,
+            )
         tokens = clip.tokenize(encoded_prompt, minimax_ref_items=visual_items)
         conditioning = clip.encode_from_tokens_scheduled(tokens)
         conditioning_values: dict[str, Any] = {"minimax_frame_count": natural_frames}
@@ -1870,6 +1890,7 @@ class TextEncodeH3Edit:
             decoder_note = "Decode H3 Edit to One Image scores the decoded context and returns one stable high-quality still."
         info = (
             f"{mode_note} | {option_mode + ' | ' if option_mode else ''}{quality_profile} | "
+            f"prompt compiler={'external compiled_prompt' if external_compiler else 'built-in'} | "
             f"requested context {requested_frames} frames | "
             f"natural packet {natural_frames} frames | "
             f"output {width}x{height} | {reference_note}{ignored_note} "

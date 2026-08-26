@@ -130,6 +130,7 @@ def _encode(
     coverage_hold_frames=5,
     coverage_loop_closure=True,
     options=None,
+    compiled_prompt=None,
 ):
     clip = FakeClip()
     vae = FakeVAE()
@@ -155,8 +156,43 @@ def _encode(
         coverage_hold_frames=coverage_hold_frames,
         coverage_loop_closure=coverage_loop_closure,
         options=options,
+        compiled_prompt=compiled_prompt,
     )
     return clip, vae, output
+
+
+def test_external_compiler_prompt_bypasses_internal_compiler_without_changing_authoring_prompt():
+    authoring_prompt = "Keep this reusable instruction unchanged while compiler profiles are swapped."
+    compiled_prompt = (
+        "subject_definitions:\n<Subject 1> is the room defined by every connected semantic picture.\n\n"
+        "summary:\n[reference generation] Generate one stable room.\n\n"
+        "retention_analysis:\n<Subject 1> (appears throughout [Shot 1]): fully_preserved - keep the room fixed.\n\n"
+        "detailed_description:\n[Shot 1] Generate the complete room and keep it motionless.\n\n"
+        "overall_soundscape:\nN/A\n\nnon_diegetic_music:\nN/A"
+    )
+
+    clip, _vae, (_conditioning, _latent, _fitted, encoded_prompt, info) = _encode(
+        REFERENCE_NONE,
+        prompt=authoring_prompt,
+        compiled_prompt=compiled_prompt,
+    )
+
+    assert encoded_prompt == compiled_prompt
+    assert clip.tokenize_calls[0][0] == compiled_prompt
+    assert authoring_prompt not in encoded_prompt
+    assert "prompt compiler=external compiled_prompt" in info
+
+
+def test_connected_external_compiler_prompt_cannot_be_empty():
+    with pytest.raises(ValueError, match="connected compiled_prompt is empty"):
+        _encode(REFERENCE_NONE, compiled_prompt="   ")
+
+
+def test_external_compiler_prompt_is_a_socket_not_an_extra_widget():
+    compiled_input = TextEncodeH3Edit.INPUT_TYPES()["optional"]["compiled_prompt"]
+
+    assert compiled_input[0] == "STRING"
+    assert compiled_input[1]["forceInput"] is True
 
 
 def _options(mode, *, show_overrides=False, profile_override=OPTION_PROFILE_CANONICAL, **overrides):

@@ -194,6 +194,13 @@ Restart ComfyUI. The nodes appear under `MiniMax H3/Edit`.
 7. Use `ModelSamplingMiniMaxH3`, `BasicGuider`, `RandomNoise`, a sampler and scheduler, and `SamplerCustomAdvanced` as in the normal native H3 graph.
 8. Decode with the output node matching the selected task: one image, character sheet, or scene coverage.
 
+To compare or develop compiler profiles without rewriting the authoring prompt, connect any STRING-producing external
+compiler to the optional `compiled_prompt` socket. A connected value bypasses only this node's built-in prompt compiler;
+the original `prompt` widget is preserved unchanged, while the encoder still prepares visual references, Qwen picture
+order, native reference blocks, keyframes, latent timing, and decoder metadata. The external value must already be the
+complete H3 prompt and must match the selected runtime task and frame profile. Disconnect it to return immediately to the
+built-in compiler and the unchanged authoring prompt.
+
 The included [mixed-reference still workflow](example_workflows/H3_Edit_Mixed_References.json) defaults to a single-image FL2VA edit using the recommended hidden 5-frame context. Its encoder exposes the role switch directly. It uses semantic glasses as `<Picture 2>` and a native wardrobe/material guide as `<Picture 3>`. Replace its model filenames and input images with files available in your ComfyUI installation; select the REF2VA model before using a native Picture 1 generation role.
 
 For a character sheet, load [H3_Character_Sheet_6_Panel.json](example_workflows/H3_Character_Sheet_6_Panel.json). Replace all three placeholder images and rewrite the per-picture assignment prompt before queueing. A 124-frame REF2VA pass is substantially slower and uses more memory than the still profiles.
