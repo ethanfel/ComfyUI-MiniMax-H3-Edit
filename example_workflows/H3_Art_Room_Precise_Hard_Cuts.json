@@ -1,0 +1,1919 @@
+{
+  "last_node_id": 29,
+  "last_link_id": 30,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "title": "FL2VA model · semantic room generation",
+      "pos": [
+        -1900,
+        -500
+      ],
+      "size": [
+        500,
+        82
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "unet_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "unet_name"
+          },
+          "link": null
+        },
+        {
+          "name": "weight_dtype",
+          "type": "COMBO",
+          "widget": {
+            "name": "weight_dtype"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            1,
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "MiniMax-H3/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "title": "H3 Qwen3-VL",
+      "pos": [
+        -1900,
+        -370
+      ],
+      "size": [
+        500,
+        106
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "clip_name"
+          },
+          "link": null
+        },
+        {
+          "name": "type",
+          "type": "COMBO",
+          "widget": {
+            "name": "type"
+          },
+          "link": null
+        },
+        {
+          "name": "device",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "device"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "MiniMax-H3/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "minimax",
+        "default"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "title": "H3 video VAE",
+      "pos": [
+        -1900,
+        -220
+      ],
+      "size": [
+        500,
+        60
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "vae_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "vae_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            4,
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "MiniMax-H3/minimax_h3_video_vae_fp16.safetensors"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "LoadImage",
+      "title": "Picture 1 · Broad floor, windows, central easel",
+      "pos": [
+        -1900,
+        100
+      ],
+      "size": [
+        350,
+        360
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            6
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "location/art_room/raw/3_regen.png",
+        "image"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "title": "Picture 2 · Cube, rug, curtain, near easel",
+      "pos": [
+        -1520,
+        100
+      ],
+      "size": [
+        350,
+        360
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            7
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "location/art_room/raw/5_regen.png",
+        "image"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "LoadImage",
+      "title": "Picture 3 · Double doors and stacked easels",
+      "pos": [
+        -1140,
+        100
+      ],
+      "size": [
+        350,
+        360
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            8
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "location/art_room/raw/1_regen.png",
+        "image"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "LoadImage",
+      "title": "Picture 4 · Coat stand and sketch-board detail",
+      "pos": [
+        -760,
+        100
+      ],
+      "size": [
+        350,
+        360
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            9
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "location/art_room/raw/4_regen.png",
+        "image"
+      ]
+    },
+    {
+      "id": 8,
+      "type": "LoadImage",
+      "title": "Picture 5 · Cube contact, easel, hanging coat",
+      "pos": [
+        -1520,
+        800
+      ],
+      "size": [
+        350,
+        360
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            10
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "location/art_room/raw/2_regen.png",
+        "image"
+      ]
+    },
+    {
+      "id": 11,
+      "type": "AddH3EditReference",
+      "title": "Picture 2 · Semantic survey",
+      "pos": [
+        -1520,
+        500
+      ],
+      "size": [
+        350,
+        190
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 7
+        },
+        {
+          "name": "transport",
+          "type": "COMBO",
+          "widget": {
+            "name": "transport"
+          },
+          "link": null
+        },
+        {
+          "name": "semantic_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "semantic_resolution"
+          },
+          "link": null
+        },
+        {
+          "name": "native_reference_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "native_reference_size"
+          },
+          "link": null
+        },
+        {
+          "name": "previous_references",
+          "shape": 7,
+          "type": "H3EDIT_REFERENCE_STACK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "references",
+          "type": "H3EDIT_REFERENCE_STACK",
+          "links": [
+            13
+          ]
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AddH3EditReference"
+      },
+      "widgets_values": [
+        "semantic (Qwen only)",
+        1024,
+        "match output area"
+      ]
+    },
+    {
+      "id": 12,
+      "type": "AddH3EditReference",
+      "title": "Picture 3 · Semantic survey",
+      "pos": [
+        -1140,
+        500
+      ],
+      "size": [
+        350,
+        190
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 8
+        },
+        {
+          "name": "transport",
+          "type": "COMBO",
+          "widget": {
+            "name": "transport"
+          },
+          "link": null
+        },
+        {
+          "name": "semantic_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "semantic_resolution"
+          },
+          "link": null
+        },
+        {
+          "name": "native_reference_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "native_reference_size"
+          },
+          "link": null
+        },
+        {
+          "name": "previous_references",
+          "shape": 7,
+          "type": "H3EDIT_REFERENCE_STACK",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "references",
+          "type": "H3EDIT_REFERENCE_STACK",
+          "links": [
+            14
+          ]
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AddH3EditReference"
+      },
+      "widgets_values": [
+        "semantic (Qwen only)",
+        1024,
+        "match output area"
+      ]
+    },
+    {
+      "id": 13,
+      "type": "AddH3EditReference",
+      "title": "Picture 4 · Semantic survey",
+      "pos": [
+        -760,
+        500
+      ],
+      "size": [
+        350,
+        190
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 9
+        },
+        {
+          "name": "transport",
+          "type": "COMBO",
+          "widget": {
+            "name": "transport"
+          },
+          "link": null
+        },
+        {
+          "name": "semantic_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "semantic_resolution"
+          },
+          "link": null
+        },
+        {
+          "name": "native_reference_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "native_reference_size"
+          },
+          "link": null
+        },
+        {
+          "name": "previous_references",
+          "shape": 7,
+          "type": "H3EDIT_REFERENCE_STACK",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "references",
+          "type": "H3EDIT_REFERENCE_STACK",
+          "links": [
+            15
+          ]
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AddH3EditReference"
+      },
+      "widgets_values": [
+        "semantic (Qwen only)",
+        1024,
+        "match output area"
+      ]
+    },
+    {
+      "id": 14,
+      "type": "AddH3EditReference",
+      "title": "Picture 5 · Semantic survey",
+      "pos": [
+        -1520,
+        1200
+      ],
+      "size": [
+        350,
+        190
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 10
+        },
+        {
+          "name": "transport",
+          "type": "COMBO",
+          "widget": {
+            "name": "transport"
+          },
+          "link": null
+        },
+        {
+          "name": "semantic_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "semantic_resolution"
+          },
+          "link": null
+        },
+        {
+          "name": "native_reference_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "native_reference_size"
+          },
+          "link": null
+        },
+        {
+          "name": "previous_references",
+          "shape": 7,
+          "type": "H3EDIT_REFERENCE_STACK",
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "references",
+          "type": "H3EDIT_REFERENCE_STACK",
+          "links": [
+            16
+          ]
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AddH3EditReference"
+      },
+      "widgets_values": [
+        "semantic (Qwen only)",
+        1024,
+        "match output area"
+      ]
+    },
+    {
+      "id": 17,
+      "type": "H3EditOptions",
+      "title": "One choice · Precise cinematic hard cuts",
+      "pos": [
+        -280,
+        20
+      ],
+      "size": [
+        430,
+        110
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "mode"
+          },
+          "link": null
+        },
+        {
+          "name": "show_overrides",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "show_overrides"
+          },
+          "link": null
+        },
+        {
+          "name": "profile_override",
+          "type": "COMBO",
+          "widget": {
+            "name": "profile_override"
+          },
+          "link": null
+        },
+        {
+          "name": "direct_reference_transport",
+          "type": "COMBO",
+          "widget": {
+            "name": "direct_reference_transport"
+          },
+          "link": null
+        },
+        {
+          "name": "source_fit",
+          "type": "COMBO",
+          "widget": {
+            "name": "source_fit"
+          },
+          "link": null
+        },
+        {
+          "name": "semantic_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "semantic_resolution"
+          },
+          "link": null
+        },
+        {
+          "name": "native_reference_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "native_reference_size"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_views",
+          "type": "INT",
+          "widget": {
+            "name": "coverage_views"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_arc_degrees",
+          "type": "FLOAT",
+          "widget": {
+            "name": "coverage_arc_degrees"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_direction",
+          "type": "COMBO",
+          "widget": {
+            "name": "coverage_direction"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_hold_frames",
+          "type": "INT",
+          "widget": {
+            "name": "coverage_hold_frames"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_loop_closure",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "coverage_loop_closure"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "options",
+          "type": "H3EDIT_OPTIONS",
+          "links": [
+            19
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "H3EditOptions"
+      },
+      "widgets_values": [
+        "scene coverage | cinematic hard cuts",
+        true,
+        "scene coverage | 243-frame camera path",
+        "semantic (Qwen only)",
+        "crop center",
+        1024,
+        "match output area",
+        8,
+        360,
+        "clockwise / camera right",
+        5,
+        false
+      ]
+    },
+    {
+      "id": 18,
+      "type": "TextEncodeH3Edit",
+      "title": "Five semantic surveys · eight exact camera placements",
+      "pos": [
+        190,
+        0
+      ],
+      "size": [
+        720,
+        650
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 3
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 4
+        },
+        {
+          "name": "source_image",
+          "type": "IMAGE",
+          "link": 6
+        },
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "name": "primary_image_role",
+          "type": "COMBO",
+          "widget": {
+            "name": "primary_image_role"
+          },
+          "link": null
+        },
+        {
+          "name": "reference_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "reference_mode"
+          },
+          "link": null
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "widget": {
+            "name": "width"
+          },
+          "link": null
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "widget": {
+            "name": "height"
+          },
+          "link": null
+        },
+        {
+          "name": "source_fit",
+          "type": "COMBO",
+          "widget": {
+            "name": "source_fit"
+          },
+          "link": null
+        },
+        {
+          "name": "prompt_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "prompt_mode"
+          },
+          "link": null
+        },
+        {
+          "name": "semantic_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "semantic_resolution"
+          },
+          "link": null
+        },
+        {
+          "name": "native_reference_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "native_reference_size"
+          },
+          "link": null
+        },
+        {
+          "name": "reference_image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "quality_profile",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_profile"
+          },
+          "link": null
+        },
+        {
+          "name": "reference_stack",
+          "shape": 7,
+          "type": "H3EDIT_REFERENCE_STACK",
+          "link": 16
+        },
+        {
+          "name": "coverage_views",
+          "type": "INT",
+          "widget": {
+            "name": "coverage_views"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_arc_degrees",
+          "type": "FLOAT",
+          "widget": {
+            "name": "coverage_arc_degrees"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_direction",
+          "type": "COMBO",
+          "widget": {
+            "name": "coverage_direction"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_hold_frames",
+          "type": "INT",
+          "widget": {
+            "name": "coverage_hold_frames"
+          },
+          "link": null
+        },
+        {
+          "name": "coverage_loop_closure",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "coverage_loop_closure"
+          },
+          "link": null
+        },
+        {
+          "name": "options",
+          "shape": 7,
+          "type": "H3EDIT_OPTIONS",
+          "link": 19
+        },
+        {
+          "name": "compiled_prompt",
+          "shape": 7,
+          "type": "STRING",
+          "link": 30
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            20
+          ]
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            21
+          ]
+        },
+        {
+          "name": "fitted_source",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "encoded_prompt",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextEncodeH3Edit"
+      },
+      "widgets_values": [
+        "Treat <Picture 1> through <Picture 5> as equal complementary surveys of one compact art studio. Reconstruct one coherent room, freeze it, and use coverage center C at the cream cube on the rug. The connected compiled prompt defines every camera position exactly.",
+        "generate | semantic Picture 1 (FL2VA)",
+        "none (source only)",
+        1344,
+        768,
+        "crop center",
+        "directed | frozen cinematic cuts",
+        1024,
+        "match output area",
+        "scene coverage | 243-frame camera path",
+        8,
+        360,
+        "clockwise / camera right",
+        5,
+        false
+      ]
+    },
+    {
+      "id": 19,
+      "type": "KSamplerSelect",
+      "pos": [
+        990,
+        -250
+      ],
+      "size": [
+        360,
+        60
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "sampler_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "sampler_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SAMPLER",
+          "type": "SAMPLER",
+          "links": [
+            22
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSamplerSelect"
+      },
+      "widgets_values": [
+        "euler"
+      ]
+    },
+    {
+      "id": 20,
+      "type": "BasicScheduler",
+      "pos": [
+        990,
+        -140
+      ],
+      "size": [
+        370,
+        130
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1
+        },
+        {
+          "name": "scheduler",
+          "type": "COMBO",
+          "widget": {
+            "name": "scheduler"
+          },
+          "link": null
+        },
+        {
+          "name": "steps",
+          "type": "INT",
+          "widget": {
+            "name": "steps"
+          },
+          "link": null
+        },
+        {
+          "name": "denoise",
+          "type": "FLOAT",
+          "widget": {
+            "name": "denoise"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SIGMAS",
+          "type": "SIGMAS",
+          "links": [
+            23
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "BasicScheduler"
+      },
+      "widgets_values": [
+        "linear_quadratic",
+        25,
+        1
+      ]
+    },
+    {
+      "id": 21,
+      "type": "BasicGuider",
+      "pos": [
+        990,
+        40
+      ],
+      "size": [
+        370,
+        80
+      ],
+      "flags": {},
+      "order": 20,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 2
+        },
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 20
+        }
+      ],
+      "outputs": [
+        {
+          "name": "GUIDER",
+          "type": "GUIDER",
+          "links": [
+            24
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "BasicGuider"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 22,
+      "type": "RandomNoise",
+      "pos": [
+        990,
+        170
+      ],
+      "size": [
+        370,
+        82
+      ],
+      "flags": {},
+      "order": 21,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise_seed",
+          "type": "INT",
+          "widget": {
+            "name": "noise_seed"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "NOISE",
+          "type": "NOISE",
+          "links": [
+            25
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "RandomNoise"
+      },
+      "widgets_values": [
+        42,
+        "randomize"
+      ]
+    },
+    {
+      "id": 23,
+      "type": "SamplerCustomAdvanced",
+      "pos": [
+        1450,
+        -40
+      ],
+      "size": [
+        360,
+        180
+      ],
+      "flags": {},
+      "order": 22,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise",
+          "type": "NOISE",
+          "link": 25
+        },
+        {
+          "name": "guider",
+          "type": "GUIDER",
+          "link": 24
+        },
+        {
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 22
+        },
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 23
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 21
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "LATENT",
+          "links": [
+            26
+          ]
+        },
+        {
+          "name": "denoised_output",
+          "type": "LATENT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SamplerCustomAdvanced"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 24,
+      "type": "DecodeH3SceneCoverage",
+      "title": "Extract eight precise art-room viewpoints",
+      "pos": [
+        1900,
+        -40
+      ],
+      "size": [
+        430,
+        180
+      ],
+      "flags": {},
+      "order": 23,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 26
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 5
+        },
+        {
+          "name": "columns",
+          "type": "INT",
+          "widget": {
+            "name": "columns"
+          },
+          "link": null
+        },
+        {
+          "name": "gutter_px",
+          "type": "INT",
+          "widget": {
+            "name": "gutter_px"
+          },
+          "link": null
+        },
+        {
+          "name": "gutter_color",
+          "type": "COMBO",
+          "widget": {
+            "name": "gutter_color"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "contact_sheet",
+          "type": "IMAGE",
+          "links": [
+            27,
+            28
+          ]
+        },
+        {
+          "name": "selected_views",
+          "type": "IMAGE",
+          "links": [
+            29
+          ]
+        },
+        {
+          "name": "all_frames",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DecodeH3SceneCoverage"
+      },
+      "widgets_values": [
+        4,
+        6,
+        "black"
+      ]
+    },
+    {
+      "id": 25,
+      "type": "PreviewImage",
+      "title": "Precise hard-cut contact sheet",
+      "pos": [
+        2420,
+        -260
+      ],
+      "size": [
+        570,
+        520
+      ],
+      "flags": {},
+      "order": 24,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 27
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 26,
+      "type": "SaveImage",
+      "title": "Save precise contact sheet",
+      "pos": [
+        2420,
+        330
+      ],
+      "size": [
+        500,
+        100
+      ],
+      "flags": {},
+      "order": 25,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 28
+        },
+        {
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "H3ArtRoomPreciseCuts/%date:yyyy-MM-dd%/CONTACT_SHEET"
+      ]
+    },
+    {
+      "id": 27,
+      "type": "SaveImage",
+      "title": "Save all eight precise viewpoints",
+      "pos": [
+        2420,
+        490
+      ],
+      "size": [
+        500,
+        100
+      ],
+      "flags": {},
+      "order": 26,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 29
+        },
+        {
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "H3ArtRoomPreciseCuts/%date:yyyy-MM-dd%/views/view"
+      ]
+    },
+    {
+      "id": 28,
+      "type": "MarkdownNote",
+      "title": "Instructions · exact positions · no Shot tags",
+      "pos": [
+        -1900,
+        2050
+      ],
+      "size": [
+        2510,
+        500
+      ],
+      "flags": {},
+      "order": 27,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "## Five semantic surveys → eight precise hard-cut views\n\nThe workflow loads the five regenerated art-room references directly from `location/art_room/raw/` in this exact order: **3_regen, 5_regen, 1_regen, 4_regen, 2_regen**. They are equal Qwen-only survey evidence; no picture is a source frame, pixel anchor, composition anchor, or timeline keyframe.\n\nThe multiline node below the encoder supplies a complete external H3 prompt. It deliberately uses **no numbered shot tags**. Eight timestamped hard cuts remain inside one continuous `detailed_description` so H3 is encouraged to preserve one room rather than re-establish eight rooms. Each camera has a named room side, distance, height, yaw, pitch, roll, lens, framing, visible anchors, exact cut time, and extraction window. Cameras remain 1.8–2.4 m from the cream cube; lenses are 45–65 mm; distant establishing views are forbidden.\n\nThe Options node deliberately enables the **243-frame** override. That gives each viewpoint about 1.25 seconds to resolve, rather than about 0.6 seconds in the canonical 124-frame/eight-cut packet. The scene-coverage decoder extracts the eight five-frame static windows and returns both individual views and a 4×2 contact sheet. Use the FL2VA model shown here because all five inputs are semantic Qwen-only references.\n\nThe continuous-camera character-sheet method that inspired this pack was created by **C_Nugget / PoopMan333**. This hard-cut variant retains that method’s calibrated extraction idea while using discrete fixed cameras.\n\n### [Open C_Nugget’s original H3 Character Sheet Generator](https://huggingface.co/PoopMan333/H3_Character_Sheet_Generator)"
+      ]
+    },
+    {
+      "id": 29,
+      "type": "PrimitiveStringMultiline",
+      "pos": [
+        190,
+        760
+      ],
+      "size": [
+        1180,
+        1100
+      ],
+      "flags": {},
+      "order": 28,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "value",
+          "type": "STRING",
+          "widget": {
+            "name": "value"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            30
+          ]
+        }
+      ],
+      "title": "Exact eight-cut H3 prompt · no Shot tags",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "PrimitiveStringMultiline"
+      },
+      "widgets_values": [
+        "subject_definitions:\n<Subject 1> is one coherent photorealistic reconstruction of the same compact institutional art studio observed across <Picture 1> through <Picture 5>. <Picture 1> supplies the broad open-floor geometry, long frosted-window wall, gray wall board, and central dark wooden easel. <Picture 2> supplies the cream cube ottoman, cream shag-rug footprint, pale-green curtain corner, and near-easel relationships. <Picture 3> supplies the double doors, transom and window arrangement, stacked dark wooden easels, and clear floor aisle. <Picture 4> supplies the honey-brown coat stand, sketch-board construction, and close easel details. <Picture 5> supplies the cube-to-rug contact, easel legs and board, white hanging coat, and local object scale. Treat these pictures as equal complementary survey evidence of one room, not as separate rooms, source frames, timeline keyframes, or compositions to copy.\n<Subject 2> is the exact central working zone inside <Subject 1>: the cream cube fixed on the cream shag rug together with the nearest upright dark wooden easel. Its coverage center C is the center of the cube's floor footprint. The cube, rug, and easel retain one fixed position and orientation relative to the windows, doors, wall board, floorboards, stacked easels, curtain, and coat stand.\n\nsummary:\n[reference generation] Reconstruct <Subject 1> from the five semantic survey pictures, freeze the completed room, then photograph <Subject 2> from eight explicitly located static cameras separated by instantaneous hard cuts. Every viewpoint remains close to the working zone and uses a normal lens; there are no distant establishing images or loosely chosen angles.\n\nretention_analysis:\n<Subject 1> (appears in every shot): fully_preserved - retain one rectangular room, its dimensions, wall order, openings, fixtures, floorboard direction, furniture, materials, neutral exposure, soft frosted-window daylight, shadows, and all object relationships without drift or redesign across cuts.\n<Subject 2> (appears in every shot): fully_preserved - retain the exact cream cube dimensions, two-part upholstery construction, horizontal seam, rounded piping, top-center seam, rug contact, rug footprint, and the nearby dark easel's construction, wear, orientation, and floor contacts. Only camera position, height, optical axis, lens, and framing may change.\n\ndetailed_description:\nThe target uses high-fidelity live-action architectural photography with realistic perspective, neutral white balance, crisp natural detail, controlled frosted-window highlights, soft daylight, clean shadow detail, and physically plausible materials. Reconcile the five pictures into one fixed coordinate system before the first frame. Define the long frosted-window wall as north; define the wall with the double doors and stacked easels as east; define the gray-board side and broad open wooden floor as south; define the pale-green-curtain and honey-brown-coat-stand corner as west. The cream rug and cube occupy the central working zone, with the nearest upright dark easel immediately adjacent. If a source crop hides a connection, infer only the shortest conservative continuation consistent with overlapping doors, windows, floorboards, rug edges, easels, and wall corners.\n\nAcross the complete 10.125-second target, the room behaves as a rigid surveyed set. The cube never spins, slides, scales, changes seams, or changes upholstery. The rug never moves or changes shape. The central easel, stacked easels, boards, stool, coat stand, hanging white coat, curtain, doors, windows, wall board, ceiling fixtures, floorboards, reflections, light sources, and shadows never move, multiply, disappear, or switch walls. Every cut is instantaneous: the first frame following a cut is already the fully resolved new camera. Do not render an orbit, travel frame, pan, dolly, truck, zoom, whip-pan, blur, dissolve, morph, or transitional viewpoint. Camera roll is 0 degrees in every shot, vertical wall edges stay vertical, exposure and white balance remain locked, and focus stays on C. No camera may be farther than 2.4 meters from C; use no lens wider than 45 mm. Avoid remote room-wide framing, empty-floor-dominated compositions, ceiling-dominated compositions, isolated product shots, macro crops, arbitrary corners, or invented camera positions. In every shot, <Subject 2> occupies roughly 50 to 70 percent of the frame and at least two named room anchors prove the camera's exact side of the room.\n\nAt 00:00.000, Camera A is due south of C on the clear open wooden floor, 2.4 meters from C and 1.45 meters above the floor. Use a 50 mm rectilinear lens, aim due north at the cube center with a 4-degree downward pitch and zero roll, and hold a static eye-level medium-wide composition. Place the cream cube and rug in the lower center, the nearest dark easel rising through the middle, the long frosted-window wall across the background, and a narrow edge of the gray wall board at frame left. Keep the cube fully visible, show its floor contact and complete top, and prevent empty floor from occupying more than the lower quarter. Extraction capture 1 is centered at 00:00.000; hold this exact camera and framing motionless from 00:00.000 through 00:00.083.\n\nAt 00:00.625, cut instantly to Camera B southwest of C, positioned where the gray-board side meets the open floor, 2.2 meters from C and 1.30 meters high. Use a 55 mm rectilinear lens, yaw northeast directly toward C, pitch down 3 degrees, and keep zero roll. Frame a close contextual three-quarter view: the cube remains complete in the lower-right-middle, the rug boundary and floorboards establish depth, the central easel is seen from its left-front quarter, and both the gray-board edge and at least one frosted opening remain visible. Do not back away into a wide room view. Extraction capture 2 is centered at 00:01.250; hold motionless from 00:01.167 through 00:01.333.\n\nAt 00:01.875, cut instantly to Camera C on the west side of C in the clear strip beside the pale-green-curtain and coat-stand corner, 2.0 meters from C and 1.15 meters high. Use a 50 mm lens, aim due east at C with a 2-degree downward pitch and zero roll. Make a contextual side view in which the cube is fully visible at center, the easel legs overlap the rug in physically correct depth, a controlled sliver of curtain or coat stand appears at frame left, and the double-door or stacked-easel wall is visible behind the working zone. The foreground anchor may border the frame but may not block the cube. Extraction capture 3 is centered at 00:02.500; hold motionless from 00:02.417 through 00:02.583.\n\nAt 00:03.167, cut instantly to Camera D northwest of C, just inside the room near the left end of the frosted-window wall but never outside or inside an object, 1.9 meters from C and 0.75 meters high. Use a 45 mm rectilinear lens, yaw southeast toward C, pitch upward 4 degrees, and keep zero roll. This is the only low camera: show the rug fibers and cube floor contact prominently, keep the complete cube silhouette, let the central easel rise behind it, and retain one frosted window frame plus the open-floor/gray-board side as background anchors. Do not exaggerate the low angle or distort verticals. Extraction capture 4 is centered at 00:03.792; hold motionless from 00:03.708 through 00:03.875.\n\nAt 00:04.417, cut instantly to Camera E due north of C in the clear interior strip in front of the frosted-window wall, 2.1 meters from C and 1.50 meters high. Use a 60 mm rectilinear lens, aim due south at C with a 5-degree downward pitch and zero roll. Create a reverse medium composition: the cube and its top seam remain complete, the back construction of the nearest easel is readable, and the open wooden floor and gray wall board establish the reverse direction. A narrow window-frame edge may remain at one border, but bright glazing must not dominate or clip the target. Extraction capture 5 is centered at 00:05.042; hold motionless from 00:04.958 through 00:05.125.\n\nAt 00:05.667, cut instantly to Camera F northeast of C, on the room side of the double doors and outside their swing path, 2.2 meters from C and 1.65 meters high. Use a 55 mm lens, yaw southwest precisely toward C, pitch down 8 degrees, and keep zero roll. Form a restrained high three-quarter view that reveals the cube's top-center seam, its horizontal side seam, the surrounding rug footprint, and the central easel's fixed relationship to it. Include a double-door jamb and part of the stacked-easel group as two discrete location anchors. The camera must remain near the area; do not turn this into a ceiling or room overview. Extraction capture 6 is centered at 00:06.292; hold motionless from 00:06.208 through 00:06.375.\n\nAt 00:06.917, cut instantly to Camera G due east of C in the clear aisle immediately in front of, but not inside, the stacked-easel storage zone, 1.8 meters from C and 1.10 meters high. Use a 65 mm rectilinear lens, aim due west at C with a 2-degree downward pitch and zero roll. Produce the tightest contextual profile: the complete cube occupies the central half of the image, the near easel's lower construction and floor contacts remain visible, the rug edge crosses the lower frame, and the curtain or coat-stand corner remains recognizable in the far background. Stacked easel rails may create a narrow foreground edge but may not obscure the target. Extraction capture 7 is centered at 00:07.583; hold motionless from 00:07.500 through 00:07.667.\n\nAt 00:08.208, cut instantly to Camera H southeast of C, on the open-floor side beside the double-door zone, 2.1 meters from C and 1.40 meters high. Use a 50 mm rectilinear lens, yaw northwest directly toward C, pitch down 4 degrees, and keep zero roll. Finish with a precise contextual three-quarter composition rather than a generic hero shot: keep the complete cube and most of the rug visible, show the nearest dark easel as the dominant vertical anchor, and retain both a frosted-window segment and the honey-brown coat stand or white hanging coat as distant orientation anchors. Match the scale and neutral exposure of the preceding shots. Extraction capture 8 is centered at 00:08.833; hold motionless from 00:08.750 through 00:08.917 and then keep this identical resolved frame static through 00:10.125.\n\noverall_soundscape:\nN/A\n\nnon_diegetic_music:\nN/A\n"
+      ],
+      "widgets_values_named": {
+        "value": "subject_definitions:\n<Subject 1> is one coherent photorealistic reconstruction of the same compact institutional art studio observed across <Picture 1> through <Picture 5>. <Picture 1> supplies the broad open-floor geometry, long frosted-window wall, gray wall board, and central dark wooden easel. <Picture 2> supplies the cream cube ottoman, cream shag-rug footprint, pale-green curtain corner, and near-easel relationships. <Picture 3> supplies the double doors, transom and window arrangement, stacked dark wooden easels, and clear floor aisle. <Picture 4> supplies the honey-brown coat stand, sketch-board construction, and close easel details. <Picture 5> supplies the cube-to-rug contact, easel legs and board, white hanging coat, and local object scale. Treat these pictures as equal complementary survey evidence of one room, not as separate rooms, source frames, timeline keyframes, or compositions to copy.\n<Subject 2> is the exact central working zone inside <Subject 1>: the cream cube fixed on the cream shag rug together with the nearest upright dark wooden easel. Its coverage center C is the center of the cube's floor footprint. The cube, rug, and easel retain one fixed position and orientation relative to the windows, doors, wall board, floorboards, stacked easels, curtain, and coat stand.\n\nsummary:\n[reference generation] Reconstruct <Subject 1> from the five semantic survey pictures, freeze the completed room, then photograph <Subject 2> from eight explicitly located static cameras separated by instantaneous hard cuts. Every viewpoint remains close to the working zone and uses a normal lens; there are no distant establishing images or loosely chosen angles.\n\nretention_analysis:\n<Subject 1> (appears in every shot): fully_preserved - retain one rectangular room, its dimensions, wall order, openings, fixtures, floorboard direction, furniture, materials, neutral exposure, soft frosted-window daylight, shadows, and all object relationships without drift or redesign across cuts.\n<Subject 2> (appears in every shot): fully_preserved - retain the exact cream cube dimensions, two-part upholstery construction, horizontal seam, rounded piping, top-center seam, rug contact, rug footprint, and the nearby dark easel's construction, wear, orientation, and floor contacts. Only camera position, height, optical axis, lens, and framing may change.\n\ndetailed_description:\nThe target uses high-fidelity live-action architectural photography with realistic perspective, neutral white balance, crisp natural detail, controlled frosted-window highlights, soft daylight, clean shadow detail, and physically plausible materials. Reconcile the five pictures into one fixed coordinate system before the first frame. Define the long frosted-window wall as north; define the wall with the double doors and stacked easels as east; define the gray-board side and broad open wooden floor as south; define the pale-green-curtain and honey-brown-coat-stand corner as west. The cream rug and cube occupy the central working zone, with the nearest upright dark easel immediately adjacent. If a source crop hides a connection, infer only the shortest conservative continuation consistent with overlapping doors, windows, floorboards, rug edges, easels, and wall corners.\n\nAcross the complete 10.125-second target, the room behaves as a rigid surveyed set. The cube never spins, slides, scales, changes seams, or changes upholstery. The rug never moves or changes shape. The central easel, stacked easels, boards, stool, coat stand, hanging white coat, curtain, doors, windows, wall board, ceiling fixtures, floorboards, reflections, light sources, and shadows never move, multiply, disappear, or switch walls. Every cut is instantaneous: the first frame following a cut is already the fully resolved new camera. Do not render an orbit, travel frame, pan, dolly, truck, zoom, whip-pan, blur, dissolve, morph, or transitional viewpoint. Camera roll is 0 degrees in every shot, vertical wall edges stay vertical, exposure and white balance remain locked, and focus stays on C. No camera may be farther than 2.4 meters from C; use no lens wider than 45 mm. Avoid remote room-wide framing, empty-floor-dominated compositions, ceiling-dominated compositions, isolated product shots, macro crops, arbitrary corners, or invented camera positions. In every shot, <Subject 2> occupies roughly 50 to 70 percent of the frame and at least two named room anchors prove the camera's exact side of the room.\n\nAt 00:00.000, Camera A is due south of C on the clear open wooden floor, 2.4 meters from C and 1.45 meters above the floor. Use a 50 mm rectilinear lens, aim due north at the cube center with a 4-degree downward pitch and zero roll, and hold a static eye-level medium-wide composition. Place the cream cube and rug in the lower center, the nearest dark easel rising through the middle, the long frosted-window wall across the background, and a narrow edge of the gray wall board at frame left. Keep the cube fully visible, show its floor contact and complete top, and prevent empty floor from occupying more than the lower quarter. Extraction capture 1 is centered at 00:00.000; hold this exact camera and framing motionless from 00:00.000 through 00:00.083.\n\nAt 00:00.625, cut instantly to Camera B southwest of C, positioned where the gray-board side meets the open floor, 2.2 meters from C and 1.30 meters high. Use a 55 mm rectilinear lens, yaw northeast directly toward C, pitch down 3 degrees, and keep zero roll. Frame a close contextual three-quarter view: the cube remains complete in the lower-right-middle, the rug boundary and floorboards establish depth, the central easel is seen from its left-front quarter, and both the gray-board edge and at least one frosted opening remain visible. Do not back away into a wide room view. Extraction capture 2 is centered at 00:01.250; hold motionless from 00:01.167 through 00:01.333.\n\nAt 00:01.875, cut instantly to Camera C on the west side of C in the clear strip beside the pale-green-curtain and coat-stand corner, 2.0 meters from C and 1.15 meters high. Use a 50 mm lens, aim due east at C with a 2-degree downward pitch and zero roll. Make a contextual side view in which the cube is fully visible at center, the easel legs overlap the rug in physically correct depth, a controlled sliver of curtain or coat stand appears at frame left, and the double-door or stacked-easel wall is visible behind the working zone. The foreground anchor may border the frame but may not block the cube. Extraction capture 3 is centered at 00:02.500; hold motionless from 00:02.417 through 00:02.583.\n\nAt 00:03.167, cut instantly to Camera D northwest of C, just inside the room near the left end of the frosted-window wall but never outside or inside an object, 1.9 meters from C and 0.75 meters high. Use a 45 mm rectilinear lens, yaw southeast toward C, pitch upward 4 degrees, and keep zero roll. This is the only low camera: show the rug fibers and cube floor contact prominently, keep the complete cube silhouette, let the central easel rise behind it, and retain one frosted window frame plus the open-floor/gray-board side as background anchors. Do not exaggerate the low angle or distort verticals. Extraction capture 4 is centered at 00:03.792; hold motionless from 00:03.708 through 00:03.875.\n\nAt 00:04.417, cut instantly to Camera E due north of C in the clear interior strip in front of the frosted-window wall, 2.1 meters from C and 1.50 meters high. Use a 60 mm rectilinear lens, aim due south at C with a 5-degree downward pitch and zero roll. Create a reverse medium composition: the cube and its top seam remain complete, the back construction of the nearest easel is readable, and the open wooden floor and gray wall board establish the reverse direction. A narrow window-frame edge may remain at one border, but bright glazing must not dominate or clip the target. Extraction capture 5 is centered at 00:05.042; hold motionless from 00:04.958 through 00:05.125.\n\nAt 00:05.667, cut instantly to Camera F northeast of C, on the room side of the double doors and outside their swing path, 2.2 meters from C and 1.65 meters high. Use a 55 mm lens, yaw southwest precisely toward C, pitch down 8 degrees, and keep zero roll. Form a restrained high three-quarter view that reveals the cube's top-center seam, its horizontal side seam, the surrounding rug footprint, and the central easel's fixed relationship to it. Include a double-door jamb and part of the stacked-easel group as two discrete location anchors. The camera must remain near the area; do not turn this into a ceiling or room overview. Extraction capture 6 is centered at 00:06.292; hold motionless from 00:06.208 through 00:06.375.\n\nAt 00:06.917, cut instantly to Camera G due east of C in the clear aisle immediately in front of, but not inside, the stacked-easel storage zone, 1.8 meters from C and 1.10 meters high. Use a 65 mm rectilinear lens, aim due west at C with a 2-degree downward pitch and zero roll. Produce the tightest contextual profile: the complete cube occupies the central half of the image, the near easel's lower construction and floor contacts remain visible, the rug edge crosses the lower frame, and the curtain or coat-stand corner remains recognizable in the far background. Stacked easel rails may create a narrow foreground edge but may not obscure the target. Extraction capture 7 is centered at 00:07.583; hold motionless from 00:07.500 through 00:07.667.\n\nAt 00:08.208, cut instantly to Camera H southeast of C, on the open-floor side beside the double-door zone, 2.1 meters from C and 1.40 meters high. Use a 50 mm rectilinear lens, yaw northwest directly toward C, pitch down 4 degrees, and keep zero roll. Finish with a precise contextual three-quarter composition rather than a generic hero shot: keep the complete cube and most of the rug visible, show the nearest dark easel as the dominant vertical anchor, and retain both a frosted-window segment and the honey-brown coat stand or white hanging coat as distant orientation anchors. Match the scale and neutral exposure of the preceding shots. Extraction capture 8 is centered at 00:08.833; hold motionless from 00:08.750 through 00:08.917 and then keep this identical resolved frame static through 00:10.125.\n\noverall_soundscape:\nN/A\n\nnon_diegetic_music:\nN/A\n"
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      20,
+      0,
+      "MODEL"
+    ],
+    [
+      2,
+      1,
+      0,
+      21,
+      0,
+      "MODEL"
+    ],
+    [
+      3,
+      2,
+      0,
+      18,
+      0,
+      "CLIP"
+    ],
+    [
+      4,
+      3,
+      0,
+      18,
+      1,
+      "VAE"
+    ],
+    [
+      5,
+      3,
+      0,
+      24,
+      1,
+      "VAE"
+    ],
+    [
+      6,
+      4,
+      0,
+      18,
+      2,
+      "IMAGE"
+    ],
+    [
+      7,
+      5,
+      0,
+      11,
+      0,
+      "IMAGE"
+    ],
+    [
+      8,
+      6,
+      0,
+      12,
+      0,
+      "IMAGE"
+    ],
+    [
+      9,
+      7,
+      0,
+      13,
+      0,
+      "IMAGE"
+    ],
+    [
+      10,
+      8,
+      0,
+      14,
+      0,
+      "IMAGE"
+    ],
+    [
+      13,
+      11,
+      0,
+      12,
+      4,
+      "H3EDIT_REFERENCE_STACK"
+    ],
+    [
+      14,
+      12,
+      0,
+      13,
+      4,
+      "H3EDIT_REFERENCE_STACK"
+    ],
+    [
+      15,
+      13,
+      0,
+      14,
+      4,
+      "H3EDIT_REFERENCE_STACK"
+    ],
+    [
+      16,
+      14,
+      0,
+      18,
+      14,
+      "H3EDIT_REFERENCE_STACK"
+    ],
+    [
+      19,
+      17,
+      0,
+      18,
+      20,
+      "H3EDIT_OPTIONS"
+    ],
+    [
+      20,
+      18,
+      0,
+      21,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      21,
+      18,
+      1,
+      23,
+      4,
+      "LATENT"
+    ],
+    [
+      22,
+      19,
+      0,
+      23,
+      2,
+      "SAMPLER"
+    ],
+    [
+      23,
+      20,
+      0,
+      23,
+      3,
+      "SIGMAS"
+    ],
+    [
+      24,
+      21,
+      0,
+      23,
+      1,
+      "GUIDER"
+    ],
+    [
+      25,
+      22,
+      0,
+      23,
+      0,
+      "NOISE"
+    ],
+    [
+      26,
+      23,
+      0,
+      24,
+      0,
+      "LATENT"
+    ],
+    [
+      27,
+      24,
+      0,
+      25,
+      0,
+      "IMAGE"
+    ],
+    [
+      28,
+      24,
+      0,
+      26,
+      0,
+      "IMAGE"
+    ],
+    [
+      29,
+      24,
+      1,
+      27,
+      0,
+      "IMAGE"
+    ],
+    [
+      30,
+      29,
+      0,
+      18,
+      21,
+      "STRING"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1 · FL2VA, Qwen, and H3 VAE",
+      "bounding": [
+        -1940,
+        -540,
+        580,
+        440
+      ],
+      "color": "#3f789e",
+      "font_size": 22,
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2 · Five complementary semantic room surveys",
+      "bounding": [
+        -1940,
+        50,
+        1570,
+        1400
+      ],
+      "color": "#496b8a",
+      "font_size": 22,
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "3 · Precise hard-cut mode and encoder",
+      "bounding": [
+        -330,
+        -50,
+        1280,
+        750
+      ],
+      "color": "#8f6f40",
+      "font_size": 22,
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "4 · Sample the 243-frame hard-cut packet",
+      "bounding": [
+        950,
+        -300,
+        910,
+        620
+      ],
+      "color": "#456744",
+      "font_size": 22,
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "5 · Extract, preview, and save 8 viewpoints",
+      "bounding": [
+        1860,
+        -310,
+        1190,
+        970
+      ],
+      "color": "#6f4c7a",
+      "font_size": 22,
+      "flags": {}
+    },
+    {
+      "id": 6,
+      "title": "Instructions and original-method credit",
+      "bounding": [
+        -1940,
+        2010,
+        2590,
+        580
+      ],
+      "color": "#7a5b32",
+      "font_size": 22,
+      "flags": {}
+    },
+    {
+      "id": 7,
+      "title": "Exact continuous H3 timeline · eight timestamped cuts",
+      "bounding": [
+        150,
+        710,
+        1260,
+        1200
+      ],
+      "color": "#6f4c7a",
+      "font_size": 22,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.52,
+      "offset": [
+        1010,
+        430
+      ]
+    }
+  },
+  "version": 0.4
+}

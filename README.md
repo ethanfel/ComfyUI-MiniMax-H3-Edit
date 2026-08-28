@@ -115,6 +115,8 @@ The included [directed-transformations workflow](example_workflows/H3_Directed_T
 
 The included [semantic room + object study workflow](example_workflows/H3_Semantic_Room_Object_Study.json) provides seven ordered Qwen-only survey inputs, the canonical 362-frame preset, a detailed Silver Estate art-studio reconstruction instruction, the scene-coverage decoder, contact-sheet and individual-view outputs, and visible credit to the original H3 character-sheet method.
 
+The [precise art-room hard-cut workflow](example_workflows/H3_Art_Room_Precise_Hard_Cuts.json) is a tighter five-reference alternative for the regenerated art-room survey. It uses the 243-frame profile for eight close contextual viewpoints and connects a complete [editable camera plan](prompts/H3_Art_Room_Precise_Hard_Cuts.txt) through `compiled_prompt`. The plan deliberately avoids numbered shot tags: one continuous `detailed_description` contains exact timestamped cuts with named room sides, distances, heights, yaw, pitch, roll, lenses, framing, visible anchors, and matching decoder extraction windows.
+
 Example instruction:
 
 ```text
@@ -204,6 +206,8 @@ built-in compiler and the unchanged authoring prompt.
 The included [mixed-reference still workflow](example_workflows/H3_Edit_Mixed_References.json) defaults to a single-image FL2VA edit using the recommended hidden 5-frame context. Its encoder exposes the role switch directly. It uses semantic glasses as `<Picture 2>` and a native wardrobe/material guide as `<Picture 3>`. Replace its model filenames and input images with files available in your ComfyUI installation; select the REF2VA model before using a native Picture 1 generation role.
 
 For a character sheet, load [H3_Character_Sheet_6_Panel.json](example_workflows/H3_Character_Sheet_6_Panel.json). Replace all three placeholder images and rewrite the per-picture assignment prompt before queueing. A 124-frame REF2VA pass is substantially slower and uses more memory than the still profiles.
+
+For the regenerated Silver Estate art-room references, load [H3_Art_Room_Precise_Hard_Cuts.json](example_workflows/H3_Art_Room_Precise_Hard_Cuts.json). Its five `LoadImage` nodes already point to `location/art_room/raw/3_regen.png`, `5_regen.png`, `1_regen.png`, `4_regen.png`, and `2_regen.png` under the ComfyUI input directory. The graph returns eight individual close contextual views plus a 4x2 contact sheet.
 
 For re-posing, character replacement, or camera movement, load [H3_Directed_Transformations.json](example_workflows/H3_Directed_Transformations.json). Keep the strong-anchor role and directed-change quality profile selected, then choose one of the three `directed` prompt modes. The workflow note includes a short prompt for each mode.
 
