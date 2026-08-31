@@ -10,6 +10,7 @@ from h3edit.nodes import (
     CHARACTER_SHEET_AUTO,
     CHARACTER_SHEET_SIX,
     NATIVE_SIZE_MATCH,
+    OPTION_MODE_CHARACTER_CLOTHING_SHEET,
     OPTION_MODE_CHARACTER_SHEET,
     OPTION_MODE_REPOSE,
     OPTION_MODE_ROOM_OBJECT_STUDY,
@@ -20,6 +21,7 @@ from h3edit.nodes import (
     PRIMARY_NATIVE_REFERENCE,
     PRIMARY_SEMANTIC_REFERENCE,
     PROMPT_CHARACTER_SWAP,
+    PROMPT_CHARACTER_CLOTHING,
     PROMPT_EDIT,
     PROMPT_NEW_ANGLE,
     PROMPT_REPOSE,
@@ -289,6 +291,42 @@ def test_connected_options_override_every_legacy_task_widget():
     assert latent["h3edit_option_mode"] == OPTION_MODE_CHARACTER_SHEET
     assert prompt.startswith("subject_definitions:")
     assert OPTION_MODE_CHARACTER_SHEET in info
+
+
+def test_clothing_character_sheet_mode_keeps_six_fixed_head_to_knee_views():
+    options = _options(OPTION_MODE_CHARACTER_CLOTHING_SHEET)
+    _clip, _vae, (_conditioning, latent, _fitted, prompt, info) = _encode(
+        REFERENCE_NONE,
+        quality_profile=QUALITY_EXPERIMENTAL,
+        prompt_mode=PROMPT_VERBATIM,
+        primary_image_role=PRIMARY_NATIVE_REFERENCE,
+        options=options,
+        prompt="Use Picture 1 for identity and Picture 2 for the complete outfit.",
+    )
+
+    assert options["prompt_mode"] == PROMPT_CHARACTER_CLOTHING
+    assert options["quality_profile"] == QUALITY_CHARACTER_SIX
+    assert latent["h3edit_requested_frames"] == 124
+    assert latent["h3edit_option_mode"] == OPTION_MODE_CHARACTER_CLOTHING_SHEET
+    assert "identical head-to-knee composition" in prompt
+    assert "one fixed 85 mm long-telephoto" in prompt
+    assert "There is no zoom, push-in, pull-out, reframing, facial close-up" in prompt
+    assert "front at 0 degrees, centered at 00:00.083" in prompt
+    assert "front-left at 60 degrees" in prompt
+    assert "square back at 180 degrees" in prompt
+    assert "front-right at 300 degrees, centered at 00:04.708" in prompt
+    assert "[Shot" not in prompt
+    assert OPTION_MODE_CHARACTER_CLOTHING_SHEET in info
+
+
+def test_clothing_character_sheet_rejects_non_six_panel_profile():
+    with pytest.raises(ValueError, match="clothing-focused character sheet requires"):
+        _encode(
+            REFERENCE_NONE,
+            quality_profile=QUALITY_CHARACTER_FOUR,
+            prompt_mode=PROMPT_CHARACTER_CLOTHING,
+            primary_image_role=PRIMARY_NATIVE_REFERENCE,
+        )
 
 
 def test_semantic_target_size_preserves_ratio_and_area_budget():

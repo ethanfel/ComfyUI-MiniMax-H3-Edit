@@ -24,6 +24,7 @@ The main encoder is always compact. Its old task-specific inputs remain in the b
 | `directed \| character swap` | swap compiler + 39-frame settled change |
 | `directed \| new camera angle` | camera compiler + 39-frame settled change |
 | `character sheet \| canonical 6 views` | six-view compiler + 124-frame orbit |
+| `character sheet \| clothing 6 views` | fixed-scale head-to-knee six-view apparel compiler + 124-frame orbit |
 | `scene coverage \| canonical camera path` | frozen-scene compiler + 124 frames + 12 views + 360° clockwise arc + five-frame holds + loop closure |
 | `scene coverage \| cinematic hard cuts` | frozen-scene compiler + 124 frames + eight discrete cinematic shots around one named target; no camera travel |
 | `scene coverage \| room + object study` | survey-reconstruction compiler + 362 frames + six room views + 10 contextual object views + exact hard cuts |
@@ -74,6 +75,8 @@ Mixed transport is intentionally labeled experimental. ComfyUI's H3 packed layou
 ## Character sheets
 
 The two character-sheet profiles generate all views in one continuous H3 pass so identity, costume, palette, and proportions share one denoising trajectory. The encoder automatically writes a silent locked-character turntable prompt in H3 full-reference structure; your prompt only needs to assign a job and ignore list to each `<Picture N>`.
+
+`character sheet | clothing 6 views` uses the same calibrated 124-frame decoder but replaces the final facial push-ins with six constant-scale apparel captures at 0°, 60°, 120°, 180°, 240°, and 300°. Every panel keeps one fixed long-telephoto lens, camera height, radius, optical target, and head-to-knee crop. There is no zoom, push-in, lens change, or facial close-up. The subject stays motionless in a neutral A-pose while the camera settles at frames `2, 21, 42, 63, 84, 113`, keeping the head, shoulders, arms, hands, torso, hips, thighs, and knees visible for clothing comparison.
 
 | Profile | Orbit frames | Extracted indices | Sheet |
 |---|---:|---|---|
@@ -206,6 +209,8 @@ built-in compiler and the unchanged authoring prompt.
 The included [mixed-reference still workflow](example_workflows/H3_Edit_Mixed_References.json) defaults to a single-image FL2VA edit using the recommended hidden 5-frame context. Its encoder exposes the role switch directly. It uses semantic glasses as `<Picture 2>` and a native wardrobe/material guide as `<Picture 3>`. Replace its model filenames and input images with files available in your ComfyUI installation; select the REF2VA model before using a native Picture 1 generation role.
 
 For a character sheet, load [H3_Character_Sheet_6_Panel.json](example_workflows/H3_Character_Sheet_6_Panel.json). Replace all three placeholder images and rewrite the per-picture assignment prompt before queueing. A 124-frame REF2VA pass is substantially slower and uses more memory than the still profiles.
+
+For fixed-scale clothing tests, load [H3_Character_Clothing_6_View.json](example_workflows/H3_Character_Clothing_6_View.json). Picture 1 defines identity and proportions, Picture 2 defines the complete outfit and front construction, and Picture 3 supplies rear construction, closures, seams, pockets, drape, or details hidden in Picture 2. The included Options node selects the clothing-focused six-view compiler, and all three example inputs use native REF2VA transport for maximum garment detail.
 
 For the regenerated Silver Estate art-room references, load [H3_Art_Room_Precise_Hard_Cuts.json](example_workflows/H3_Art_Room_Precise_Hard_Cuts.json). Its five `LoadImage` nodes already point to `location/art_room/raw/3_regen.png`, `5_regen.png`, `1_regen.png`, `4_regen.png`, and `2_regen.png` under the ComfyUI input directory. The graph returns eight individual close contextual views plus a 4x2 contact sheet.
 

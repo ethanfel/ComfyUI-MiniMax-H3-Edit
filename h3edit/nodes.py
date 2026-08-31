@@ -74,19 +74,27 @@ PROMPT_EDIT = "edit instruction"
 PROMPT_REPOSE = "directed | re-pose character"
 PROMPT_CHARACTER_SWAP = "directed | character swap"
 PROMPT_NEW_ANGLE = "directed | new camera angle"
+PROMPT_CHARACTER_CLOTHING = "character sheet | clothing head-to-knee"
 PROMPT_SCENE_COVERAGE = "directed | frozen scene coverage"
 PROMPT_SCENE_CUTS = "directed | frozen cinematic cuts"
 PROMPT_ROOM_OBJECT_STUDY = "directed | room and object study cuts"
 PROMPT_VERBATIM = "use prompt verbatim"
 DIRECTED_PROMPT_MODES = [PROMPT_REPOSE, PROMPT_CHARACTER_SWAP, PROMPT_NEW_ANGLE]
 SCENE_PROMPT_MODES = [PROMPT_SCENE_COVERAGE, PROMPT_SCENE_CUTS, PROMPT_ROOM_OBJECT_STUDY]
-PROMPT_MODES = [PROMPT_EDIT, *DIRECTED_PROMPT_MODES, *SCENE_PROMPT_MODES, PROMPT_VERBATIM]
+PROMPT_MODES = [
+    PROMPT_EDIT,
+    PROMPT_CHARACTER_CLOTHING,
+    *DIRECTED_PROMPT_MODES,
+    *SCENE_PROMPT_MODES,
+    PROMPT_VERBATIM,
+]
 
 OPTION_MODE_STILL = "still | edit or generate"
 OPTION_MODE_REPOSE = "directed | re-pose character"
 OPTION_MODE_CHARACTER_SWAP = "directed | character swap"
 OPTION_MODE_NEW_ANGLE = "directed | new camera angle"
 OPTION_MODE_CHARACTER_SHEET = "character sheet | canonical 6 views"
+OPTION_MODE_CHARACTER_CLOTHING_SHEET = "character sheet | clothing 6 views"
 OPTION_MODE_SCENE_COVERAGE = "scene coverage | canonical camera path"
 OPTION_MODE_SCENE_CUTS = "scene coverage | cinematic hard cuts"
 OPTION_MODE_ROOM_OBJECT_STUDY = "scene coverage | room + object study"
@@ -98,6 +106,7 @@ EDIT_OPTION_PRESETS = {
     OPTION_MODE_CHARACTER_SWAP: (PROMPT_CHARACTER_SWAP, QUALITY_DIRECTED_CHANGE),
     OPTION_MODE_NEW_ANGLE: (PROMPT_NEW_ANGLE, QUALITY_DIRECTED_CHANGE),
     OPTION_MODE_CHARACTER_SHEET: (PROMPT_EDIT, QUALITY_CHARACTER_SIX),
+    OPTION_MODE_CHARACTER_CLOTHING_SHEET: (PROMPT_CHARACTER_CLOTHING, QUALITY_CHARACTER_SIX),
     OPTION_MODE_SCENE_COVERAGE: (PROMPT_SCENE_COVERAGE, QUALITY_SCENE_SHORT),
     OPTION_MODE_SCENE_CUTS: (PROMPT_SCENE_CUTS, QUALITY_SCENE_SHORT),
     OPTION_MODE_ROOM_OBJECT_STUDY: (PROMPT_ROOM_OBJECT_STUDY, QUALITY_SCENE_LONG),
@@ -755,6 +764,7 @@ def _build_character_sheet_prompt(
     reference_modes: list[str],
     primary_image_role: str,
     frame_count: int,
+    clothing_focus: bool = False,
 ) -> str:
     primary_transport = (
         REFERENCE_SEMANTIC if primary_image_role == PRIMARY_SEMANTIC_REFERENCE else REFERENCE_NATIVE
@@ -765,7 +775,46 @@ def _build_character_sheet_prompt(
         for ordinal, reference_mode in enumerate(picture_modes, start=1)
     )
 
-    if frame_count == 73:
+    if clothing_focus:
+        if frame_count != 124:
+            raise ValueError("The clothing-focused character sheet requires the 124-frame six-panel profile.")
+        summary = (
+            "[reference generation] The target video presents <Subject 1> as one coherent character in six calibrated "
+            "apparel views at 0, 60, 120, 180, 240, and 300 degrees, always using the same head-to-knee framing."
+        )
+        retention = (
+            "<Subject 1> (appears throughout the target video): fully_preserved - preserve the requested identity, facial "
+            "structure, anatomy, hairstyle, body proportions, garment silhouette, layering, closures, seams, stitching, "
+            "darts, pockets, lapels, cuffs, waist construction, materials, colors, patterns, accessories, and fabric folds "
+            "without drift between angles; exclude every source background, source pose, and unrequested person."
+        )
+        detail = (
+            "The target uses the requested visual style with sharp face, fabric, seam, and construction detail against a "
+            "solid uniform light-gray seamless backdrop under soft, even, color-neutral form lighting. <Subject 1> stands "
+            "centered in a relaxed neutral A-pose, arms held slightly clear of the torso so sleeves, side seams, waist, "
+            "pockets, and hip construction remain visible; palms face the thighs, the head stays level, eyes remain open, "
+            "and the expression remains neutral. The complete character exists below the crop, but every output uses one "
+            "identical head-to-knee composition: leave a small constant margin above the hair, keep both shoulders, elbows, "
+            "hands, torso, hips, thighs, and both knees inside the image, and place the lower frame edge immediately below "
+            "the knees. Never include the feet and never crop the head, hands, garment sides, or knees. "
+            "The character remains rigidly motionless and does not turn; hair, fabric, hems, straps, jewelry, fasteners, "
+            "accessories, and folds remain locked in exactly the same configuration. Only the physical camera moves "
+            "clockwise around the character. Use one fixed 85 mm long-telephoto near-orthographic lens, one fixed camera "
+            "height, one fixed radius, one fixed optical-axis target at the mid-torso, and zero roll for the complete timeline. "
+            "Focal length, field of view, character scale, headroom, knee margin, perspective, exposure, focus, and lighting "
+            "remain identical. There is no zoom, push-in, pull-out, reframing, facial close-up, lens change, pedestal, tilt, "
+            "independent pan, camera shake, motion blur, body motion, breathing, blinking, wind, or secondary cloth motion. "
+            "Move smoothly between the following calibrated angles and become perfectly static during every capture hold: "
+            "front at 0 degrees, centered at 00:00.083 and held from 00:00.000 through 00:00.167; front-left at 60 degrees, "
+            "centered at 00:00.875 and held from 00:00.792 through 00:00.958; back-left at 120 degrees, centered at "
+            "00:01.750 and held from 00:01.667 through 00:01.833; square back at 180 degrees, centered at 00:02.625 and "
+            "held from 00:02.542 through 00:02.708; back-right at 240 degrees, centered at 00:03.500 and held from "
+            "00:03.417 through 00:03.583; and front-right at 300 degrees, centered at 00:04.708 and held from 00:04.625 "
+            "through 00:04.792. After the final hold, retain the same 300-degree head-to-knee view unchanged through the "
+            "last frame. The six captured panels must look like the same locked camera rig photographing the same garment "
+            "on the same person from six positions, never like separately generated portraits."
+        )
+    elif frame_count == 73:
         summary = (
             "[reference generation] The target video presents <Subject 1> as one coherent character in a silent "
             "three-second studio turntable: a front view, left profile, back view, and final front facial close-up."
@@ -939,7 +988,13 @@ def _build_prompt(
         )
 
     if frame_count in {73, 124}:
-        return _build_character_sheet_prompt(prompt, reference_modes, primary_image_role, frame_count)
+        return _build_character_sheet_prompt(
+            prompt,
+            reference_modes,
+            primary_image_role,
+            frame_count,
+            clothing_focus=prompt_mode == PROMPT_CHARACTER_CLOTHING,
+        )
 
     if prompt_mode in DIRECTED_PROMPT_MODES:
         return _build_directed_change_prompt(prompt, prompt_mode, reference_modes, frame_count)
@@ -1330,6 +1385,7 @@ class H3EditOptions:
                 OPTION_MODE_STILL: set(STILL_QUALITY_PROFILES),
                 OPTION_MODE_VERBATIM: set(STILL_QUALITY_PROFILES),
                 OPTION_MODE_CHARACTER_SHEET: {QUALITY_CHARACTER_FOUR, QUALITY_CHARACTER_SIX},
+                OPTION_MODE_CHARACTER_CLOTHING_SHEET: {QUALITY_CHARACTER_SIX},
                 OPTION_MODE_SCENE_COVERAGE: set(SCENE_COVERAGE_PROFILES),
                 OPTION_MODE_SCENE_CUTS: set(SCENE_COVERAGE_PROFILES),
                 OPTION_MODE_ROOM_OBJECT_STUDY: set(SCENE_COVERAGE_PROFILES),
@@ -1654,6 +1710,7 @@ class TextEncodeH3Edit:
             raise ValueError(f"Unknown quality_profile: {quality_profile}")
         directed_task = prompt_mode in DIRECTED_PROMPT_MODES
         scene_task = prompt_mode in SCENE_PROMPT_MODES
+        clothing_sheet_task = prompt_mode == PROMPT_CHARACTER_CLOTHING
         cinematic_cut_task = prompt_mode in {PROMPT_SCENE_CUTS, PROMPT_ROOM_OBJECT_STUDY}
         scene_profile = quality_profile in SCENE_COVERAGE_PROFILES
         if directed_task and primary_image_role != PRIMARY_EDIT_ANCHOR:
@@ -1664,6 +1721,8 @@ class TextEncodeH3Edit:
             raise ValueError("Frozen scene coverage requires a 'scene coverage | ... camera path' quality profile.")
         if scene_profile and not scene_task:
             raise ValueError("Scene-coverage quality profiles require a frozen scene-coverage prompt mode.")
+        if clothing_sheet_task and quality_profile != QUALITY_CHARACTER_SIX:
+            raise ValueError("The clothing-focused character sheet requires 'character sheet | 6 panels / 124-frame orbit'.")
         if coverage_direction not in SCENE_DIRECTIONS:
             raise ValueError(f"Unknown coverage direction: {coverage_direction}")
         coverage_views = max(2, min(24, int(coverage_views)))

@@ -5,6 +5,7 @@ from pathlib import Path
 
 WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Edit_Mixed_References.json"
 CHARACTER_WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Character_Sheet_6_Panel.json"
+CLOTHING_WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Character_Clothing_6_View.json"
 DIRECTED_WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Directed_Transformations.json"
 
 
@@ -83,6 +84,37 @@ def test_character_sheet_workflow_uses_ref2va_orbit_and_pack_decoder():
     assert credit["type"] == "MarkdownNote"
     assert "C_Nugget" in credit["widgets_values"][0]
     assert "https://huggingface.co/PoopMan333/H3_Character_Sheet_Generator" in credit["widgets_values"][0]
+
+
+def test_clothing_character_workflow_keeps_fixed_head_to_knee_framing():
+    _graph, nodes = _load_validated_workflow(CLOTHING_WORKFLOW)
+
+    assert len(nodes) == 21
+    assert "ref2va" in nodes[1]["widgets_values"][0]
+    assert nodes[21]["type"] == "H3EditOptions"
+    assert nodes[21]["widgets_values"][0] == "character sheet | clothing 6 views"
+    assert nodes[21]["widgets_values"][1] is False
+
+    encoder = nodes[9]
+    assert encoder["widgets_values"][1] == "generate | native Picture 1 (REF2VA)"
+    assert encoder["widgets_values"][6] == "character sheet | clothing head-to-knee"
+    assert encoder["widgets_values"][9] == "character sheet | 6 panels / 124-frame orbit"
+    assert encoder["inputs"][14]["link"] is not None
+    assert encoder["inputs"][20]["name"] == "options"
+    assert encoder["inputs"][20]["link"] is not None
+    assert "rear construction" in encoder["widgets_values"][0]
+
+    assert nodes[7]["widgets_values"][0] == "native (Qwen + VAE ref)"
+    assert nodes[8]["widgets_values"][0] == "native (Qwen + VAE ref)"
+    decoder = nodes[15]
+    assert decoder["widgets_values"] == ["auto from encoded profile", 6, "black"]
+    assert "head-to-knee" in decoder["title"]
+
+    instructions = nodes[20]["widgets_values"][0]
+    assert "never zooms" in instructions
+    assert "frames **2, 21, 42, 63, 84, and 113**" in instructions
+    assert "without numbered shot tags" in instructions
+    assert "C_Nugget" in instructions
 
 
 def test_directed_workflow_switches_three_tasks_and_selects_settled_tail():
