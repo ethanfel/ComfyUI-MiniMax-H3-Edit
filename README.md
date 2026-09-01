@@ -8,7 +8,7 @@ The pack adds six nodes:
 - **H3 Edit Options** — selects one canonical task preset; expert overrides remain collapsed until explicitly enabled.
 - **Text Encode H3 Edit / Generate** — switches between a strong source-photo edit and reference-driven generation, then builds H3 conditioning from optional ordered guides.
 - **Decode H3 Edit to One Image** — decodes the packet, scores its candidates, and returns one stable high-quality frame.
-- **Decode H3 Character Sheet** — extracts calibrated views from a 73/124-frame character orbit and stitches a 2x2 or 3x2 sheet.
+- **Decode H3 Character Sheet** — extracts calibrated views from a 73/124/243-frame character sequence and stitches a 2x2, 3x2, or 4x2 sheet.
 - **Decode H3 Scene Coverage** — scores every timed camera hold and returns 2–24 consistent viewpoints, a contact sheet, and the complete camera path.
 
 The still path produces exactly one image. By default, it samples the same short 5-frame context used by H3 Studio because H3 is a video model and a literal one-token latent leaves no temporal context around the result. Character-sheet profiles instead produce one stitched sheet plus optional selected/all-frame batches. The old true-one-frame path remains available as an explicitly experimental, low-quality option.
@@ -25,6 +25,7 @@ The main encoder is always compact. Its old task-specific inputs remain in the b
 | `directed \| new camera angle` | camera compiler + 39-frame settled change |
 | `character sheet \| canonical 6 views` | six-view compiler + 124-frame orbit |
 | `character sheet \| clothing 6 views` | fixed-scale head-to-knee six-view apparel compiler + 124-frame orbit |
+| `character sheet \| canonical 8 views` | four body views + two waist-to-knee details + two face views in 243 frames |
 | `scene coverage \| canonical camera path` | frozen-scene compiler + 124 frames + 12 views + 360° clockwise arc + five-frame holds + loop closure |
 | `scene coverage \| cinematic hard cuts` | frozen-scene compiler + 124 frames + eight discrete cinematic shots around one named target; no camera travel |
 | `scene coverage \| room + object study` | survey-reconstruction compiler + 362 frames + six room views + 10 contextual object views + exact hard cuts |
@@ -74,21 +75,24 @@ Mixed transport is intentionally labeled experimental. ComfyUI's H3 packed layou
 
 ## Character sheets
 
-The two character-sheet profiles generate all views in one continuous H3 pass so identity, costume, palette, and proportions share one denoising trajectory. The encoder automatically writes a silent locked-character turntable prompt in H3 full-reference structure; your prompt only needs to assign a job and ignore list to each `<Picture N>`.
+The character-sheet profiles generate all views in one continuous H3 pass so identity, palette, and proportions share one denoising trajectory. The encoder automatically writes a silent locked-character camera prompt in H3 full-reference structure; your prompt only needs to assign a job and ignore list to each `<Picture N>`.
 
 `character sheet | clothing 6 views` uses the same calibrated 124-frame decoder but replaces the final facial push-ins with six constant-scale apparel captures at 0°, 60°, 120°, 180°, 240°, and 300°. Every panel keeps one fixed long-telephoto lens, camera height, radius, optical target, and head-to-knee crop. There is no zoom, push-in, lens change, or facial close-up. The subject stays motionless in a neutral A-pose while the camera settles at frames `2, 21, 42, 63, 84, 113`, keeping the head, shoulders, arms, hands, torso, hips, thighs, and knees visible for clothing comparison.
 
-| Profile | Orbit frames | Extracted indices | Sheet |
+`character sheet | canonical 8 views` expands the timeline to 243 frames (10.13 seconds at 24 fps). It captures square-front, left-profile, square-back, and right-profile full-body views at frames `2, 36, 72, 108`; square-front and shallow front-left three-quarter waist-to-knee views at `156, 180`; then front and front-left three-quarter head-and-shoulders views at `207, 237`. Every target has a five-frame static hold, the subject remains unchanged and non-explicit, and Auto decoding uses embedded profile metadata to produce a 4x2 sheet.
+
+| Profile | Sequence frames | Extracted indices | Sheet |
 |---|---:|---|---|
 | `4 panels` | 73 | `2, 24, 45, 68` | 2x2 |
 | `6 panels` | 124 | `2, 21, 42, 63, 84, 113` | 3x2 |
+| `8 panels` | 243 | `2, 36, 72, 108, 156, 180, 207, 237` | 4x2 |
 
 Use a generation role rather than the strong edit anchor. Native Picture 1 plus native builders is the default high-fidelity REF2VA route. An all-semantic set uses Qwen-only FL2VA generation without any input VAE encoding; semantic/native mixing remains experimental.
 
 **Decode H3 Character Sheet** returns:
 
 - one stitched sheet;
-- the four or six selected views as a batch;
+- the four, six, or eight selected views as a batch;
 - all decoded orbit frames for manual frame selection;
 - the resolved indices and dimensions as diagnostic text.
 
@@ -162,8 +166,9 @@ The quality selector chooses the temporal context. Still profiles feed the one-i
 | `directed change` | 39 | 12 | One controlled transformation; decoder scores settled tail frames 34–38 |
 | `character sheet · 4 panels` | 73 | 22 | 180-degree body orbit plus front facial view |
 | `character sheet · 6 panels` | 124 | 37 | 360-degree body orbit plus two facial views |
+| `character sheet · 8 panels` | 243 | 72 | body orbit plus two waist-to-knee and two facial views |
 
-The first five entries are Studio-style compact still-image profiles. Their prompt asks for a locked camera and an immediately completed result held unchanged, then the still decoder scores sharpness, contrast, exposure, and temporal stability. The directed profile assigns the temporal budget to exactly one transformation before scoring only the completed tail. The two character-sheet profiles deliberately use long moving-camera orbits and fixed extraction indices instead.
+The first five entries are Studio-style compact still-image profiles. Their prompt asks for a locked camera and an immediately completed result held unchanged, then the still decoder scores sharpness, contrast, exposure, and temporal stability. The directed profile assigns the temporal budget to exactly one transformation before scoring only the completed tail. The character-sheet profiles deliberately use long moving-camera sequences and fixed extraction indices instead.
 
 This pack does not freeze temporal RoPE. The quality paths intentionally use H3's natural temporal coordinates so the model can evolve away from the edit anchor or form a new reference-driven image. In true-one-frame mode there is only one target temporal coordinate, so a RoPE freeze would be a no-op.
 
@@ -211,6 +216,8 @@ The included [mixed-reference still workflow](example_workflows/H3_Edit_Mixed_Re
 For a character sheet, load [H3_Character_Sheet_6_Panel.json](example_workflows/H3_Character_Sheet_6_Panel.json). Replace all three placeholder images and rewrite the per-picture assignment prompt before queueing. A 124-frame REF2VA pass is substantially slower and uses more memory than the still profiles.
 
 For fixed-scale clothing tests, load [H3_Character_Clothing_6_View.json](example_workflows/H3_Character_Clothing_6_View.json). Picture 1 defines identity and proportions, Picture 2 defines the complete outfit and front construction, and Picture 3 supplies rear construction, closures, seams, pockets, drape, or details hidden in Picture 2. The included Options node selects the clothing-focused six-view compiler, and all three example inputs use native REF2VA transport for maximum garment detail.
+
+For the longer body/detail/face sequence, load [H3_Character_Sheet_8_View.json](example_workflows/H3_Character_Sheet_8_View.json). Its Options node selects the 243-frame eight-view compiler, its decoder automatically extracts the embedded capture schedule into a 4x2 sheet, and its three native reference inputs provide complementary identity, full-body, rear, and facial evidence.
 
 For the regenerated Silver Estate art-room references, load [H3_Art_Room_Precise_Hard_Cuts.json](example_workflows/H3_Art_Room_Precise_Hard_Cuts.json). Its five `LoadImage` nodes already point to `location/art_room/raw/3_regen.png`, `5_regen.png`, `1_regen.png`, `4_regen.png`, and `2_regen.png` under the ComfyUI input directory. The graph returns eight individual close contextual views plus a 4x2 contact sheet.
 

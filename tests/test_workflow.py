@@ -6,6 +6,7 @@ from pathlib import Path
 WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Edit_Mixed_References.json"
 CHARACTER_WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Character_Sheet_6_Panel.json"
 CLOTHING_WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Character_Clothing_6_View.json"
+EIGHT_VIEW_WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Character_Sheet_8_View.json"
 DIRECTED_WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Directed_Transformations.json"
 
 
@@ -113,6 +114,36 @@ def test_clothing_character_workflow_keeps_fixed_head_to_knee_framing():
     instructions = nodes[20]["widgets_values"][0]
     assert "never zooms" in instructions
     assert "frames **2, 21, 42, 63, 84, and 113**" in instructions
+    assert "without numbered shot tags" in instructions
+    assert "C_Nugget" in instructions
+
+
+def test_eight_view_character_workflow_uses_long_body_detail_face_sequence():
+    _graph, nodes = _load_validated_workflow(EIGHT_VIEW_WORKFLOW)
+
+    assert len(nodes) == 21
+    assert "ref2va" in nodes[1]["widgets_values"][0]
+    assert nodes[21]["type"] == "H3EditOptions"
+    assert nodes[21]["widgets_values"][0] == "character sheet | canonical 8 views"
+    assert nodes[21]["widgets_values"][1] is False
+
+    encoder = nodes[9]
+    assert encoder["widgets_values"][1] == "generate | native Picture 1 (REF2VA)"
+    assert encoder["widgets_values"][6] == "character sheet | 8-view body detail"
+    assert encoder["widgets_values"][9] == "character sheet | 8 panels / 243-frame sequence"
+    assert encoder["inputs"][14]["link"] is not None
+    assert encoder["inputs"][20]["name"] == "options"
+    assert encoder["inputs"][20]["link"] is not None
+    assert "adult character" in encoder["widgets_values"][0]
+
+    decoder = nodes[15]
+    assert decoder["widgets_values"] == ["auto from encoded profile", 6, "black"]
+    assert "eight calibrated" in decoder["title"]
+
+    instructions = nodes[20]["widgets_values"][0]
+    assert "243-frame" in instructions
+    assert "frames **2, 36, 72, 108, 156, 180, 207, and 237**" in instructions
+    assert "waist-to-knee" in instructions
     assert "without numbered shot tags" in instructions
     assert "C_Nugget" in instructions
 

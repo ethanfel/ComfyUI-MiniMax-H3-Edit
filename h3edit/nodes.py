@@ -26,6 +26,7 @@ QUALITY_EXPERIMENTAL = "experimental | true 1 frame (low quality)"
 QUALITY_DIRECTED_CHANGE = "directed change | 39-frame settle -> 1 image"
 QUALITY_CHARACTER_FOUR = "character sheet | 4 panels / 73-frame orbit"
 QUALITY_CHARACTER_SIX = "character sheet | 6 panels / 124-frame orbit"
+QUALITY_CHARACTER_EIGHT = "character sheet | 8 panels / 243-frame sequence"
 QUALITY_SCENE_SHORT = "scene coverage | 124-frame camera path"
 QUALITY_SCENE_MEDIUM = "scene coverage | 243-frame camera path"
 QUALITY_SCENE_LONG = "scene coverage | 362-frame camera path"
@@ -38,6 +39,7 @@ QUALITY_PROFILES = {
     QUALITY_DIRECTED_CHANGE: 39,
     QUALITY_CHARACTER_FOUR: 73,
     QUALITY_CHARACTER_SIX: 124,
+    QUALITY_CHARACTER_EIGHT: 243,
     QUALITY_SCENE_SHORT: 124,
     QUALITY_SCENE_MEDIUM: 243,
     QUALITY_SCENE_LONG: 362,
@@ -50,11 +52,18 @@ SCENE_COVERAGE_PROFILES = {
 CHARACTER_SHEET_FRAME_INDICES = {
     QUALITY_CHARACTER_FOUR: (2, 24, 45, 68),
     QUALITY_CHARACTER_SIX: (2, 21, 42, 63, 84, 113),
+    QUALITY_CHARACTER_EIGHT: (2, 36, 72, 108, 156, 180, 207, 237),
 }
 CHARACTER_SHEET_AUTO = "auto from encoded profile"
 CHARACTER_SHEET_FOUR = "4 panels | 2x2"
 CHARACTER_SHEET_SIX = "6 panels | 3x2"
-CHARACTER_SHEET_LAYOUTS = [CHARACTER_SHEET_AUTO, CHARACTER_SHEET_FOUR, CHARACTER_SHEET_SIX]
+CHARACTER_SHEET_EIGHT = "8 panels | 4x2"
+CHARACTER_SHEET_LAYOUTS = [
+    CHARACTER_SHEET_AUTO,
+    CHARACTER_SHEET_FOUR,
+    CHARACTER_SHEET_SIX,
+    CHARACTER_SHEET_EIGHT,
+]
 GUTTER_COLORS = ["black", "neutral gray", "white"]
 
 REFERENCE_NONE = "none (source only)"
@@ -75,6 +84,7 @@ PROMPT_REPOSE = "directed | re-pose character"
 PROMPT_CHARACTER_SWAP = "directed | character swap"
 PROMPT_NEW_ANGLE = "directed | new camera angle"
 PROMPT_CHARACTER_CLOTHING = "character sheet | clothing head-to-knee"
+PROMPT_CHARACTER_EIGHT = "character sheet | 8-view body detail"
 PROMPT_SCENE_COVERAGE = "directed | frozen scene coverage"
 PROMPT_SCENE_CUTS = "directed | frozen cinematic cuts"
 PROMPT_ROOM_OBJECT_STUDY = "directed | room and object study cuts"
@@ -84,6 +94,7 @@ SCENE_PROMPT_MODES = [PROMPT_SCENE_COVERAGE, PROMPT_SCENE_CUTS, PROMPT_ROOM_OBJE
 PROMPT_MODES = [
     PROMPT_EDIT,
     PROMPT_CHARACTER_CLOTHING,
+    PROMPT_CHARACTER_EIGHT,
     *DIRECTED_PROMPT_MODES,
     *SCENE_PROMPT_MODES,
     PROMPT_VERBATIM,
@@ -95,6 +106,7 @@ OPTION_MODE_CHARACTER_SWAP = "directed | character swap"
 OPTION_MODE_NEW_ANGLE = "directed | new camera angle"
 OPTION_MODE_CHARACTER_SHEET = "character sheet | canonical 6 views"
 OPTION_MODE_CHARACTER_CLOTHING_SHEET = "character sheet | clothing 6 views"
+OPTION_MODE_CHARACTER_EIGHT_SHEET = "character sheet | canonical 8 views"
 OPTION_MODE_SCENE_COVERAGE = "scene coverage | canonical camera path"
 OPTION_MODE_SCENE_CUTS = "scene coverage | cinematic hard cuts"
 OPTION_MODE_ROOM_OBJECT_STUDY = "scene coverage | room + object study"
@@ -107,6 +119,7 @@ EDIT_OPTION_PRESETS = {
     OPTION_MODE_NEW_ANGLE: (PROMPT_NEW_ANGLE, QUALITY_DIRECTED_CHANGE),
     OPTION_MODE_CHARACTER_SHEET: (PROMPT_EDIT, QUALITY_CHARACTER_SIX),
     OPTION_MODE_CHARACTER_CLOTHING_SHEET: (PROMPT_CHARACTER_CLOTHING, QUALITY_CHARACTER_SIX),
+    OPTION_MODE_CHARACTER_EIGHT_SHEET: (PROMPT_CHARACTER_EIGHT, QUALITY_CHARACTER_EIGHT),
     OPTION_MODE_SCENE_COVERAGE: (PROMPT_SCENE_COVERAGE, QUALITY_SCENE_SHORT),
     OPTION_MODE_SCENE_CUTS: (PROMPT_SCENE_CUTS, QUALITY_SCENE_SHORT),
     OPTION_MODE_ROOM_OBJECT_STUDY: (PROMPT_ROOM_OBJECT_STUDY, QUALITY_SCENE_LONG),
@@ -765,7 +778,9 @@ def _build_character_sheet_prompt(
     primary_image_role: str,
     frame_count: int,
     clothing_focus: bool = False,
+    eight_view_focus: bool = False,
 ) -> str:
+    eight_view_focus = eight_view_focus or frame_count == 243
     primary_transport = (
         REFERENCE_SEMANTIC if primary_image_role == PRIMARY_SEMANTIC_REFERENCE else REFERENCE_NATIVE
     )
@@ -775,7 +790,42 @@ def _build_character_sheet_prompt(
         for ordinal, reference_mode in enumerate(picture_modes, start=1)
     )
 
-    if clothing_focus:
+    if eight_view_focus:
+        if frame_count != 243:
+            raise ValueError("The eight-view character sheet requires the 243-frame profile.")
+        summary = (
+            "[reference generation] The target video presents <Subject 1> as one coherent character in eight calibrated "
+            "captures: four full-body orbit views, two front-oriented waist-to-knee detail views, and two facial views."
+        )
+        retention = (
+            "<Subject 1> (appears throughout the target video): fully_preserved - preserve the requested identity, facial "
+            "structure, anatomy, hairstyle, body proportions, surface detail, colors, accessories, and established body "
+            "coverage without drift between captures; exclude every source background, source pose, and unrequested person."
+        )
+        detail = (
+            "The target uses the requested visual style with sharp anatomical and facial detail against a solid uniform "
+            "light-gray seamless backdrop under soft, even, color-neutral form lighting. <Subject 1> stands centered in a "
+            "relaxed neutral A-pose, arms slightly clear of the torso, palms toward the thighs, head level, eyes open, and "
+            "expression neutral. The character remains rigidly motionless. Hair, surface details, accessories, and all "
+            "established body coverage remain locked in exactly the same configuration; do not introduce nudity or explicit "
+            "anatomical exposure. Camera roll, exposure, focus, lighting, and subject proportions remain fixed. There is no "
+            "body motion, breathing, blinking, wind, secondary motion, camera shake, or motion blur. Use one continuous "
+            "untagged timeline and become perfectly static during every five-frame capture hold. Begin with a fixed long-"
+            "telephoto near-orthographic full-body composition. Capture square front, centered at 00:00.083 and held from "
+            "00:00.000 through 00:00.167; left profile, centered at 00:01.500 and held from 00:01.417 through 00:01.583; "
+            "square back, centered at 00:03.000 and held from 00:02.917 through 00:03.083; and right profile, centered at "
+            "00:04.500 and held from 00:04.417 through 00:04.583. Complete the same clockwise orbit back to square front by "
+            "00:06.000 without changing the character. Then move the camera to a neutral square-front waist-to-knee "
+            "composition, with the upper frame edge slightly above the waist and the lower edge immediately below both "
+            "knees; settle it at 00:06.500 and hold from 00:06.417 through 00:06.583. Without changing crop height or "
+            "magnification, move to a shallow front-left three-quarter waist-to-knee view, centered at 00:07.500 and held "
+            "from 00:07.417 through 00:07.583. Next return square front while moving upward into a locked head-and-shoulders "
+            "view, centered at 00:08.625 and held from 00:08.542 through 00:08.708. Finally reposition to a clean front-left "
+            "three-quarter head-and-shoulders view, centered at 00:09.875 and held from 00:09.792 through 00:09.958; retain "
+            "that final view unchanged through the last frame. Every transition is a deliberate physical camera move, never "
+            "a morph, and every extracted capture must depict the same unchanged person."
+        )
+    elif clothing_focus:
         if frame_count != 124:
             raise ValueError("The clothing-focused character sheet requires the 124-frame six-panel profile.")
         summary = (
@@ -987,13 +1037,14 @@ def _build_prompt(
             anchored_scene,
         )
 
-    if frame_count in {73, 124}:
+    if frame_count in {73, 124, 243}:
         return _build_character_sheet_prompt(
             prompt,
             reference_modes,
             primary_image_role,
             frame_count,
             clothing_focus=prompt_mode == PROMPT_CHARACTER_CLOTHING,
+            eight_view_focus=prompt_mode == PROMPT_CHARACTER_EIGHT,
         )
 
     if prompt_mode in DIRECTED_PROMPT_MODES:
@@ -1386,6 +1437,7 @@ class H3EditOptions:
                 OPTION_MODE_VERBATIM: set(STILL_QUALITY_PROFILES),
                 OPTION_MODE_CHARACTER_SHEET: {QUALITY_CHARACTER_FOUR, QUALITY_CHARACTER_SIX},
                 OPTION_MODE_CHARACTER_CLOTHING_SHEET: {QUALITY_CHARACTER_SIX},
+                OPTION_MODE_CHARACTER_EIGHT_SHEET: {QUALITY_CHARACTER_EIGHT},
                 OPTION_MODE_SCENE_COVERAGE: set(SCENE_COVERAGE_PROFILES),
                 OPTION_MODE_SCENE_CUTS: set(SCENE_COVERAGE_PROFILES),
                 OPTION_MODE_ROOM_OBJECT_STUDY: set(SCENE_COVERAGE_PROFILES),
@@ -1544,8 +1596,8 @@ class TextEncodeH3Edit:
                         "default": QUALITY_RECOMMENDED,
                         "tooltip": (
                             "H3 is video-trained. Recommended matches Studio's short 5-frame context, then the decoder "
-                            "returns one stable frame. Character-sheet profiles create calibrated 73/124-frame orbits for "
-                            "the dedicated sheet decoder. Scene-coverage profiles create a trained-range camera path for "
+                            "returns one stable frame. Character-sheet profiles create calibrated 73/124/243-frame "
+                            "sequences for the dedicated sheet decoder. Scene-coverage profiles create a trained-range camera path for "
                             "the dedicated coverage decoder. True 1-frame mode is often poor quality."
                         ),
                     },
@@ -1711,6 +1763,7 @@ class TextEncodeH3Edit:
         directed_task = prompt_mode in DIRECTED_PROMPT_MODES
         scene_task = prompt_mode in SCENE_PROMPT_MODES
         clothing_sheet_task = prompt_mode == PROMPT_CHARACTER_CLOTHING
+        eight_sheet_task = prompt_mode == PROMPT_CHARACTER_EIGHT
         cinematic_cut_task = prompt_mode in {PROMPT_SCENE_CUTS, PROMPT_ROOM_OBJECT_STUDY}
         scene_profile = quality_profile in SCENE_COVERAGE_PROFILES
         if directed_task and primary_image_role != PRIMARY_EDIT_ANCHOR:
@@ -1723,6 +1776,8 @@ class TextEncodeH3Edit:
             raise ValueError("Scene-coverage quality profiles require a frozen scene-coverage prompt mode.")
         if clothing_sheet_task and quality_profile != QUALITY_CHARACTER_SIX:
             raise ValueError("The clothing-focused character sheet requires 'character sheet | 6 panels / 124-frame orbit'.")
+        if eight_sheet_task and quality_profile != QUALITY_CHARACTER_EIGHT:
+            raise ValueError("The eight-view character sheet requires 'character sheet | 8 panels / 243-frame sequence'.")
         if coverage_direction not in SCENE_DIRECTIONS:
             raise ValueError(f"Unknown coverage direction: {coverage_direction}")
         coverage_views = max(2, min(24, int(coverage_views)))
@@ -1935,6 +1990,7 @@ class TextEncodeH3Edit:
             route = "REF2VA" if native_count else "FL2VA"
             mode_note = f"Reference-driven generation | no frame-zero keyframe | expected route {route}"
         if quality_profile in CHARACTER_SHEET_FRAME_INDICES:
+            latent["h3edit_character_sheet_profile"] = quality_profile
             decoder_note = "Decode H3 Character Sheet extracts the calibrated views and returns a stitched sheet."
         elif scene_profile:
             decoder_note = (
@@ -2090,11 +2146,11 @@ class DecodeH3SingleFrame:
 
 
 class DecodeH3CharacterSheet:
-    """Decode an H3 orbit, extract calibrated views, and stitch one character sheet."""
+    """Decode an H3 character sequence, extract calibrated views, and stitch one sheet."""
 
     DESCRIPTION = (
-        "Decodes a 73- or 124-frame H3 character orbit, extracts the calibrated four or six views, and stitches a 2x2 "
-        "or 3x2 sheet. Also returns the selected views and full decoded frame batch."
+        "Decodes a 73-, 124-, or 243-frame H3 character sequence, extracts four, six, or eight calibrated views, and "
+        "stitches a 2x2, 3x2, or 4x2 sheet. Also returns the selected views and full decoded frame batch."
     )
 
     @classmethod
@@ -2105,7 +2161,7 @@ class DecodeH3CharacterSheet:
                 "vae": ("VAE", {"tooltip": "MiniMax H3 video VAE."}),
                 "layout": (
                     CHARACTER_SHEET_LAYOUTS,
-                    {"default": CHARACTER_SHEET_AUTO, "tooltip": "Auto reads the encoded 73/124-frame profile."},
+                    {"default": CHARACTER_SHEET_AUTO, "tooltip": "Auto reads the encoded 73/124/243-frame profile."},
                 ),
                 "gutter_px": ("INT", {"default": 6, "min": 0, "max": 256, "step": 1}),
                 "gutter_color": (GUTTER_COLORS, {"default": "black"}),
@@ -2115,8 +2171,8 @@ class DecodeH3CharacterSheet:
     RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "STRING")
     RETURN_NAMES = ("sheet", "selected_views", "all_frames", "info")
     OUTPUT_TOOLTIPS = (
-        "One stitched 2x2 or 3x2 character sheet.",
-        "The four or six calibrated views as an IMAGE batch.",
+        "One stitched 2x2, 3x2, or 4x2 character sheet.",
+        "The four, six, or eight calibrated views as an IMAGE batch.",
         "Every decoded orbit frame for manual inspection or alternate picks.",
         "Resolved layout, decoded frame count, extraction indices, and output size.",
     )
@@ -2139,17 +2195,26 @@ class DecodeH3CharacterSheet:
         video, frames, decoded_frames = _decode_h3_frames(samples, vae, "Decode H3 Character Sheet")
         requested_frames = max(1, int(samples.get("h3edit_requested_frames", decoded_frames)))
         if layout == CHARACTER_SHEET_AUTO:
-            if requested_frames >= 124:
+            encoded_profile = samples.get("h3edit_character_sheet_profile")
+            if encoded_profile in CHARACTER_SHEET_FRAME_INDICES:
+                profile = encoded_profile
+            elif requested_frames >= 243:
+                profile = QUALITY_CHARACTER_EIGHT
+            elif requested_frames >= 124:
                 profile = QUALITY_CHARACTER_SIX
             elif requested_frames >= 73:
                 profile = QUALITY_CHARACTER_FOUR
             else:
                 raise ValueError(
-                    "Auto character-sheet layout requires a 73- or 124-frame encoded profile; "
+                    "Auto character-sheet layout requires a 73-, 124-, or 243-frame encoded profile; "
                     f"the latent requests {requested_frames} frame(s)."
                 )
         else:
-            profile = QUALITY_CHARACTER_FOUR if layout == CHARACTER_SHEET_FOUR else QUALITY_CHARACTER_SIX
+            profile = {
+                CHARACTER_SHEET_FOUR: QUALITY_CHARACTER_FOUR,
+                CHARACTER_SHEET_SIX: QUALITY_CHARACTER_SIX,
+                CHARACTER_SHEET_EIGHT: QUALITY_CHARACTER_EIGHT,
+            }[layout]
 
         indices = CHARACTER_SHEET_FRAME_INDICES[profile]
         if decoded_frames <= max(indices):
@@ -2157,7 +2222,11 @@ class DecodeH3CharacterSheet:
                 f"{profile} needs decoded frame index {max(indices)}, but the VAE returned only {decoded_frames} frame(s)."
             )
         selected = frames[list(indices)].clone()
-        columns = 2 if profile == QUALITY_CHARACTER_FOUR else 3
+        columns = {
+            QUALITY_CHARACTER_FOUR: 2,
+            QUALITY_CHARACTER_SIX: 3,
+            QUALITY_CHARACTER_EIGHT: 4,
+        }[profile]
         gutter_value = {"black": 0.0, "neutral gray": 0.5, "white": 1.0}[gutter_color]
         sheet = _stitch_character_panels(selected, columns, gutter_px, gutter_value)
         return (

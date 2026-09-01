@@ -8,9 +8,11 @@ import torch
 
 from h3edit.nodes import (
     CHARACTER_SHEET_AUTO,
+    CHARACTER_SHEET_EIGHT,
     CHARACTER_SHEET_SIX,
     NATIVE_SIZE_MATCH,
     OPTION_MODE_CHARACTER_CLOTHING_SHEET,
+    OPTION_MODE_CHARACTER_EIGHT_SHEET,
     OPTION_MODE_CHARACTER_SHEET,
     OPTION_MODE_REPOSE,
     OPTION_MODE_ROOM_OBJECT_STUDY,
@@ -22,6 +24,7 @@ from h3edit.nodes import (
     PRIMARY_SEMANTIC_REFERENCE,
     PROMPT_CHARACTER_SWAP,
     PROMPT_CHARACTER_CLOTHING,
+    PROMPT_CHARACTER_EIGHT,
     PROMPT_EDIT,
     PROMPT_NEW_ANGLE,
     PROMPT_REPOSE,
@@ -30,6 +33,7 @@ from h3edit.nodes import (
     PROMPT_SCENE_CUTS,
     PROMPT_VERBATIM,
     QUALITY_CHARACTER_FOUR,
+    QUALITY_CHARACTER_EIGHT,
     QUALITY_CHARACTER_SIX,
     QUALITY_DIRECTED_CHANGE,
     QUALITY_EXPERIMENTAL,
@@ -329,6 +333,42 @@ def test_clothing_character_sheet_rejects_non_six_panel_profile():
         )
 
 
+def test_eight_view_character_sheet_uses_long_sequence_and_detail_captures():
+    options = _options(OPTION_MODE_CHARACTER_EIGHT_SHEET)
+    _clip, _vae, (_conditioning, latent, _fitted, prompt, info) = _encode(
+        REFERENCE_NONE,
+        quality_profile=QUALITY_EXPERIMENTAL,
+        prompt_mode=PROMPT_VERBATIM,
+        primary_image_role=PRIMARY_NATIVE_REFERENCE,
+        options=options,
+        prompt="Use Picture 1 for the character identity and proportions.",
+    )
+
+    assert options["prompt_mode"] == PROMPT_CHARACTER_EIGHT
+    assert options["quality_profile"] == QUALITY_CHARACTER_EIGHT
+    assert latent["h3edit_requested_frames"] == 243
+    assert latent["h3edit_character_sheet_profile"] == QUALITY_CHARACTER_EIGHT
+    assert latent["h3edit_option_mode"] == OPTION_MODE_CHARACTER_EIGHT_SHEET
+    assert "four full-body orbit views" in prompt
+    assert "square-front waist-to-knee" in prompt
+    assert "front-left three-quarter waist-to-knee" in prompt
+    assert "head-and-shoulders" in prompt
+    assert "00:09.875" in prompt
+    assert "do not introduce nudity or explicit anatomical exposure" in prompt
+    assert "[Shot" not in prompt
+    assert OPTION_MODE_CHARACTER_EIGHT_SHEET in info
+
+
+def test_eight_view_character_sheet_rejects_short_profile():
+    with pytest.raises(ValueError, match="eight-view character sheet requires"):
+        _encode(
+            REFERENCE_NONE,
+            quality_profile=QUALITY_CHARACTER_SIX,
+            prompt_mode=PROMPT_CHARACTER_EIGHT,
+            primary_image_role=PRIMARY_NATIVE_REFERENCE,
+        )
+
+
 def test_semantic_target_size_preserves_ratio_and_area_budget():
     width, height = semantic_target_size(_image(height=2000, width=1000), 1024)
 
@@ -484,6 +524,26 @@ def test_six_panel_character_profile_builds_native_ref2va_orbit():
     assert "minimax_keyframes" not in conditioning[0][1]
     assert len(conditioning[0][1]["minimax_refs"]) == 1
     assert "360-degree orbit" in prompt
+    assert "expected route REF2VA" in info
+
+
+def test_eight_panel_profile_direct_selection_uses_eight_view_compiler():
+    _clip, vae, (conditioning, latent, _prepared_primary, prompt, info) = _encode(
+        REFERENCE_NONE,
+        quality_profile=QUALITY_CHARACTER_EIGHT,
+        primary_image_role=PRIMARY_NATIVE_REFERENCE,
+    )
+
+    video, audio = latent["samples"].unbind()
+    assert video.shape == (1, 24, 72, 84, 48)
+    assert audio.shape == (1, 32, 2, 405)
+    assert latent["h3edit_requested_frames"] == 243
+    assert latent["h3edit_natural_frames"] == 243
+    assert latent["h3edit_character_sheet_profile"] == QUALITY_CHARACTER_EIGHT
+    assert len(vae.encoded) == 1
+    assert "minimax_keyframes" not in conditioning[0][1]
+    assert "eight calibrated captures" in prompt
+    assert "00:06.500" in prompt
     assert "expected route REF2VA" in info
 
 
@@ -1033,6 +1093,54 @@ def test_character_sheet_decoder_can_force_six_panel_layout():
     assert all_frames.shape == (124, 64, 48, 3)
     assert selected[:, 0, 0, 0].tolist() == [2.0, 21.0, 42.0, 63.0, 84.0, 113.0]
     assert "3x2 sheet" in info
+
+
+def test_character_sheet_decoder_uses_encoded_eight_panel_profile():
+    vae = FakeVAE()
+    video = torch.zeros((1, 24, 72, 4, 3))
+    audio = torch.zeros((1, 32, 2, 405))
+    samples = {
+        "samples": FakeNestedTensor((video, audio)),
+        "h3edit_requested_frames": 243,
+        "h3edit_natural_frames": 243,
+        "h3edit_character_sheet_profile": QUALITY_CHARACTER_EIGHT,
+    }
+
+    sheet, selected, all_frames, info = DecodeH3CharacterSheet().decode(
+        samples,
+        vae,
+        CHARACTER_SHEET_AUTO,
+        6,
+        "black",
+    )
+
+    assert sheet.shape == (1, 134, 210, 3)
+    assert selected.shape == (8, 64, 48, 3)
+    assert all_frames.shape == (243, 64, 48, 3)
+    assert selected[:, 0, 0, 0].tolist() == [2.0, 36.0, 72.0, 108.0, 156.0, 180.0, 207.0, 237.0]
+    assert "4x2 sheet" in info
+
+
+def test_character_sheet_decoder_can_force_eight_panel_layout():
+    vae = FakeVAE()
+    video = torch.zeros((1, 24, 72, 4, 3))
+    audio = torch.zeros((1, 32, 2, 405))
+    samples = {
+        "samples": FakeNestedTensor((video, audio)),
+        "h3edit_requested_frames": 243,
+        "h3edit_natural_frames": 243,
+    }
+
+    _sheet, selected, _all_frames, info = DecodeH3CharacterSheet().decode(
+        samples,
+        vae,
+        CHARACTER_SHEET_EIGHT,
+        6,
+        "neutral gray",
+    )
+
+    assert selected.shape[0] == 8
+    assert "4x2 sheet" in info
 
 
 def test_scene_coverage_decoder_scores_each_hold_and_pads_contact_sheet():
