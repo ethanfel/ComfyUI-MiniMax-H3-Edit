@@ -333,7 +333,7 @@ def test_clothing_character_sheet_rejects_non_six_panel_profile():
         )
 
 
-def test_eight_view_character_sheet_reuses_short_sequence_and_detail_captures():
+def test_eight_view_character_sheet_inserts_two_second_detail_phase():
     options = _options(OPTION_MODE_CHARACTER_EIGHT_SHEET)
     _clip, _vae, (_conditioning, latent, _fitted, prompt, info) = _encode(
         REFERENCE_NONE,
@@ -346,7 +346,7 @@ def test_eight_view_character_sheet_reuses_short_sequence_and_detail_captures():
 
     assert options["prompt_mode"] == PROMPT_CHARACTER_EIGHT
     assert options["quality_profile"] == QUALITY_CHARACTER_EIGHT
-    assert latent["h3edit_requested_frames"] == 124
+    assert latent["h3edit_requested_frames"] == 171
     assert latent["h3edit_character_sheet_profile"] == QUALITY_CHARACTER_EIGHT
     assert latent["h3edit_option_mode"] == OPTION_MODE_CHARACTER_EIGHT_SHEET
     assert "four full-body orbit views" in prompt
@@ -354,7 +354,7 @@ def test_eight_view_character_sheet_reuses_short_sequence_and_detail_captures():
     assert "back-right three-quarter waist-to-knee" in prompt
     assert "camera never stops during this detail orbit" in prompt
     assert "head-and-shoulders" in prompt
-    assert "00:05.000" in prompt
+    assert "00:06.667" in prompt
     assert "do not introduce nudity or explicit anatomical exposure" in prompt
     assert "[Shot" not in prompt
     assert OPTION_MODE_CHARACTER_EIGHT_SHEET in info
@@ -536,10 +536,10 @@ def test_eight_panel_profile_direct_selection_uses_eight_view_compiler():
     )
 
     video, audio = latent["samples"].unbind()
-    assert video.shape == (1, 24, 37, 84, 48)
-    assert audio.shape == (1, 32, 2, 207)
-    assert latent["h3edit_requested_frames"] == 124
-    assert latent["h3edit_natural_frames"] == 124
+    assert video.shape == (1, 24, 51, 84, 48)
+    assert audio.shape == (1, 32, 2, 285)
+    assert latent["h3edit_requested_frames"] == 171
+    assert latent["h3edit_natural_frames"] == 171
     assert latent["h3edit_character_sheet_profile"] == QUALITY_CHARACTER_EIGHT
     assert len(vae.encoded) == 1
     assert "minimax_keyframes" not in conditioning[0][1]
@@ -1098,12 +1098,12 @@ def test_character_sheet_decoder_can_force_six_panel_layout():
 
 def test_character_sheet_decoder_uses_encoded_eight_panel_profile():
     vae = FakeVAE()
-    video = torch.zeros((1, 24, 37, 4, 3))
-    audio = torch.zeros((1, 32, 2, 207))
+    video = torch.zeros((1, 24, 51, 4, 3))
+    audio = torch.zeros((1, 32, 2, 285))
     samples = {
         "samples": FakeNestedTensor((video, audio)),
-        "h3edit_requested_frames": 124,
-        "h3edit_natural_frames": 124,
+        "h3edit_requested_frames": 171,
+        "h3edit_natural_frames": 171,
         "h3edit_character_sheet_profile": QUALITY_CHARACTER_EIGHT,
     }
 
@@ -1117,19 +1117,19 @@ def test_character_sheet_decoder_uses_encoded_eight_panel_profile():
 
     assert sheet.shape == (1, 134, 210, 3)
     assert selected.shape == (8, 64, 48, 3)
-    assert all_frames.shape == (124, 64, 48, 3)
-    assert selected[:, 0, 0, 0].tolist() == [2.0, 21.0, 42.0, 63.0, 84.0, 96.0, 108.0, 120.0]
+    assert all_frames.shape == (171, 64, 48, 3)
+    assert selected[:, 0, 0, 0].tolist() == [2.0, 21.0, 42.0, 63.0, 84.0, 108.0, 131.0, 160.0]
     assert "4x2 sheet" in info
 
 
 def test_character_sheet_decoder_can_force_eight_panel_layout():
     vae = FakeVAE()
-    video = torch.zeros((1, 24, 37, 4, 3))
-    audio = torch.zeros((1, 32, 2, 207))
+    video = torch.zeros((1, 24, 51, 4, 3))
+    audio = torch.zeros((1, 32, 2, 285))
     samples = {
         "samples": FakeNestedTensor((video, audio)),
-        "h3edit_requested_frames": 124,
-        "h3edit_natural_frames": 124,
+        "h3edit_requested_frames": 171,
+        "h3edit_natural_frames": 171,
     }
 
     _sheet, selected, _all_frames, info = DecodeH3CharacterSheet().decode(

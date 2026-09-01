@@ -684,7 +684,7 @@
         "character sheet | 8-view body detail",
         1024,
         "match output area",
-        "character sheet | 8 panels / 124-frame sequence",
+        "character sheet | 8 panels / 171-frame sequence",
         12,
         360,
         "clockwise / camera right",
@@ -1186,7 +1186,7 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "## Eight calibrated character views\n\nThis REF2VA workflow reuses the canonical **124-frame** sequence. Views 1–4 preserve the original full-body orbit and decoder frames **2, 21, 42, and 63** unchanged. The camera then rapidly pushes to waist-to-knee framing while continuing clockwise through moving left-profile and back-right three-quarter captures at frames **84 and 96**, then rapidly pushes upward to front and front-left three-quarter face captures at frames **108 and 120**. The decoder extracts frames **2, 21, 42, 63, 84, 96, 108, and 120** and stitches a 4×2 sheet.\n\nThe camera never stops during views 5–6; their angle change and background parallax must remain visible. The subject remains unchanged and non-explicit throughout.\n\nUse **Picture 1** for identity and proportions, **Picture 2** for complementary front or side evidence, and **Picture 3** for complementary rear or facial evidence. All three inputs are native Qwen+VAE references and therefore require the REF2VA model shown in the workflow. Rewrite the assignment prompt when using fewer references or assigning different roles.\n\nThe prompt uses one continuous timeline without numbered shot tags. Check the first generation for spatial and identity continuity because the no-shot-tag continuity technique remains an empirical workflow choice.\n\n## Credit and inspiration\n\nThis workflow adapts the continuous H3 orbit and calibrated panel-selection method created by **C_Nugget**.\n\n### [Open C_Nugget’s original H3 Character Sheet Generator on Hugging Face](https://huggingface.co/PoopMan333/H3_Character_Sheet_Generator)"
+        "## Eight calibrated character views\n\nThis REF2VA workflow uses a natural **171-frame** sequence. Views 1–4 preserve the original canonical full-body orbit and decoder frames **2, 21, 42, and 63** unchanged. It then inserts an approximately two-second waist-to-knee phase: the camera rapidly pushes down and continues clockwise through moving left-profile and back-right three-quarter captures at frames **84 and 108**. The original facial sequence is shifted later, with front and front-left three-quarter face captures at frames **131 and 160**. The decoder extracts frames **2, 21, 42, 63, 84, 108, 131, and 160** and stitches a 4×2 sheet.\n\nThe camera never stops during views 5–6; their angle change and background parallax must remain visible. The subject remains unchanged and non-explicit throughout.\n\nUse **Picture 1** for identity and proportions, **Picture 2** for complementary front or side evidence, and **Picture 3** for complementary rear or facial evidence. All three inputs are native Qwen+VAE references and therefore require the REF2VA model shown in the workflow. Rewrite the assignment prompt when using fewer references or assigning different roles.\n\nThe prompt uses one continuous timeline without numbered shot tags. Check the first generation for spatial and identity continuity because the no-shot-tag continuity technique remains an empirical workflow choice.\n\n## Credit and inspiration\n\nThis workflow adapts the continuous H3 orbit and calibrated panel-selection method created by **C_Nugget**.\n\n### [Open C_Nugget’s original H3 Character Sheet Generator on Hugging Face](https://huggingface.co/PoopMan333/H3_Character_Sheet_Generator)"
       ]
     },
     {
@@ -1537,7 +1537,7 @@
     },
     {
       "id": 3,
-      "title": "3 · 124-frame eight-view sequence",
+      "title": "3 · 171-frame eight-view sequence",
       "bounding": [
         -160,
         -230,

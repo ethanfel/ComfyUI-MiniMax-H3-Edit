@@ -131,7 +131,7 @@ def test_eight_view_character_workflow_uses_long_body_detail_face_sequence():
     encoder = nodes[9]
     assert encoder["widgets_values"][1] == "generate | native Picture 1 (REF2VA)"
     assert encoder["widgets_values"][6] == "character sheet | 8-view body detail"
-    assert encoder["widgets_values"][9] == "character sheet | 8 panels / 124-frame sequence"
+    assert encoder["widgets_values"][9] == "character sheet | 8 panels / 171-frame sequence"
     assert encoder["inputs"][14]["link"] is not None
     assert encoder["inputs"][20]["name"] == "options"
     assert encoder["inputs"][20]["link"] is not None
@@ -142,8 +142,8 @@ def test_eight_view_character_workflow_uses_long_body_detail_face_sequence():
     assert "eight calibrated" in decoder["title"]
 
     instructions = nodes[20]["widgets_values"][0]
-    assert "124-frame" in instructions
-    assert "frames **2, 21, 42, 63, 84, 96, 108, and 120**" in instructions
+    assert "171-frame" in instructions
+    assert "frames **2, 21, 42, 63, 84, 108, 131, and 160**" in instructions
     assert "waist-to-knee" in instructions
     assert "never stops" in instructions
     assert "without numbered shot tags" in instructions
@@ -163,12 +163,12 @@ def test_standalone_eight_view_prompt_matches_decoder_schedule():
 
     assert [prompt.index(section) for section in sections] == sorted(prompt.index(section) for section in sections)
     assert all(f"<Picture {ordinal}>" in prompt for ordinal in (1, 2, 3))
-    assert "124-frame target" in prompt
+    assert "171-frame target" in prompt
     assert "decoder frame 84" in prompt
-    assert "decoder frame 96" in prompt
+    assert "decoder frame 108" in prompt
     assert "camera never stops during this detail orbit" in prompt
-    assert "00:04.500" in prompt
-    assert "00:05.000" in prompt
+    assert "00:05.458" in prompt
+    assert "00:06.667" in prompt
     assert "[Shot" not in prompt
 
 
