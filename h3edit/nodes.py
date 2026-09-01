@@ -26,7 +26,7 @@ QUALITY_EXPERIMENTAL = "experimental | true 1 frame (low quality)"
 QUALITY_DIRECTED_CHANGE = "directed change | 39-frame settle -> 1 image"
 QUALITY_CHARACTER_FOUR = "character sheet | 4 panels / 73-frame orbit"
 QUALITY_CHARACTER_SIX = "character sheet | 6 panels / 124-frame orbit"
-QUALITY_CHARACTER_EIGHT = "character sheet | 8 panels / 243-frame sequence"
+QUALITY_CHARACTER_EIGHT = "character sheet | 8 panels / 124-frame sequence"
 QUALITY_SCENE_SHORT = "scene coverage | 124-frame camera path"
 QUALITY_SCENE_MEDIUM = "scene coverage | 243-frame camera path"
 QUALITY_SCENE_LONG = "scene coverage | 362-frame camera path"
@@ -39,7 +39,7 @@ QUALITY_PROFILES = {
     QUALITY_DIRECTED_CHANGE: 39,
     QUALITY_CHARACTER_FOUR: 73,
     QUALITY_CHARACTER_SIX: 124,
-    QUALITY_CHARACTER_EIGHT: 243,
+    QUALITY_CHARACTER_EIGHT: 124,
     QUALITY_SCENE_SHORT: 124,
     QUALITY_SCENE_MEDIUM: 243,
     QUALITY_SCENE_LONG: 362,
@@ -52,7 +52,7 @@ SCENE_COVERAGE_PROFILES = {
 CHARACTER_SHEET_FRAME_INDICES = {
     QUALITY_CHARACTER_FOUR: (2, 24, 45, 68),
     QUALITY_CHARACTER_SIX: (2, 21, 42, 63, 84, 113),
-    QUALITY_CHARACTER_EIGHT: (2, 30, 60, 90, 150, 195, 225, 240),
+    QUALITY_CHARACTER_EIGHT: (2, 21, 42, 63, 84, 96, 108, 120),
 }
 CHARACTER_SHEET_AUTO = "auto from encoded profile"
 CHARACTER_SHEET_FOUR = "4 panels | 2x2"
@@ -780,7 +780,6 @@ def _build_character_sheet_prompt(
     clothing_focus: bool = False,
     eight_view_focus: bool = False,
 ) -> str:
-    eight_view_focus = eight_view_focus or frame_count == 243
     primary_transport = (
         REFERENCE_SEMANTIC if primary_image_role == PRIMARY_SEMANTIC_REFERENCE else REFERENCE_NATIVE
     )
@@ -791,8 +790,8 @@ def _build_character_sheet_prompt(
     )
 
     if eight_view_focus:
-        if frame_count != 243:
-            raise ValueError("The eight-view character sheet requires the 243-frame profile.")
+        if frame_count != 124:
+            raise ValueError("The eight-view character sheet requires the 124-frame profile.")
         summary = (
             "[reference generation] The target video presents <Subject 1> as one coherent character in eight calibrated "
             "captures: four full-body orbit views, two continuously orbiting waist-to-knee detail views, and two facial "
@@ -811,22 +810,23 @@ def _build_character_sheet_prompt(
             "established body coverage remain locked in exactly the same configuration; do not introduce nudity or explicit "
             "anatomical exposure. Camera roll, exposure, focus, lighting, and subject proportions remain fixed. There is no "
             "body motion, breathing, blinking, wind, secondary motion, camera shake, or motion blur. Use one continuous "
-            "untagged timeline. Begin with a fixed long-telephoto near-orthographic full-body composition. Briefly become "
-            "perfectly static for square front, centered at 00:00.083 and held from 00:00.000 through 00:00.167; left "
-            "profile, centered at 00:01.250 and held from 00:01.167 through 00:01.333; square back, centered at 00:02.500 "
-            "and held from 00:02.417 through 00:02.583; and right profile, centered at 00:03.750 and held from 00:03.667 "
-            "through 00:03.833. Complete the same clockwise orbit back to square front by 00:05.000 without changing the "
-            "character. While continuing the clockwise rotation without any pause or capture hold, lower the optical target "
-            "and tighten to a waist-to-knee composition whose upper edge sits slightly above the waist and whose lower edge "
-            "sits immediately below both knees. The camera never stops during this detail orbit. It passes the exact left-"
-            "profile waist-to-knee view at 00:06.250, decoder frame 150, then passes square back and reaches the exact back-"
-            "right three-quarter waist-to-knee view at 00:08.125, decoder frame 195. Keep both pass-by frames crisp with no "
-            "motion blur and preserve identical crop height and magnification while the background parallax proves the "
-            "camera is still rotating. Continue clockwise to square front by 00:09.000, then move upward into a locked head-"
-            "and-shoulders view, centered at 00:09.375 and held from 00:09.292 through 00:09.458. Finally reposition to a "
-            "clean front-left three-quarter head-and-shoulders view, centered at 00:10.000 and held from 00:09.917 through "
-            "00:10.083, the last frame. Every transition is a deliberate physical camera move, never a morph, and every "
-            "extracted capture must depict the same unchanged person."
+            "untagged timeline. Begin with exactly the canonical six-view full-body phase, unchanged: from 00:00.000 to "
+            "00:03.000 the camera performs one smooth constant-speed 360-degree clockwise orbit, beginning square front, "
+            "passing the left profile at one quarter turn, reaching square back at halfway, passing the right profile at "
+            "three quarters, and returning square front. Keep the fixed long-telephoto near-orthographic full-body "
+            "composition, scale, lighting, proportions, and surface details identical throughout this first phase. The "
+            "decoder preserves the original canonical body captures at frames 2, 21, 42, and 63. At 00:03.000, rapidly "
+            "push in and lower the optical target to a waist-to-knee composition whose upper edge sits slightly above the "
+            "waist and whose lower edge sits immediately below both knees. The camera never stops during this detail orbit. "
+            "Continue rotating clockwise without stopping: "
+            "pass the exact left-profile waist-to-knee view at 00:03.500, decoder frame 84, and the exact back-right three-"
+            "quarter waist-to-knee view at 00:04.000, decoder frame 96. Keep both moving pass-by frames crisp with no motion "
+            "blur; changing background parallax must prove the camera is still rotating. Immediately continue clockwise to "
+            "square front while rapidly redirecting upward and pushing into a locked head-and-shoulders view centered at "
+            "00:04.500, decoder frame 108. Then quickly reposition to a clean front-left three-quarter head-and-shoulders "
+            "view centered at 00:05.000, decoder frame 120, and retain it unchanged through the last frame. Every transition "
+            "is a deliberate physical camera move, never a morph, and every extracted capture depicts the same unchanged "
+            "person."
         )
     elif clothing_focus:
         if frame_count != 124:
@@ -1001,6 +1001,7 @@ def _build_prompt(
     frame_count: int,
     primary_image_role: str,
     *,
+    character_sheet_profile: str | None = None,
     scene_capture_plan: dict[str, Any] | None = None,
     scene_direction: str = SCENE_DIRECTION_CLOCKWISE,
     scene_loop_closure: bool = False,
@@ -1040,14 +1041,16 @@ def _build_prompt(
             anchored_scene,
         )
 
-    if frame_count in {73, 124, 243}:
+    if frame_count in {73, 124}:
         return _build_character_sheet_prompt(
             prompt,
             reference_modes,
             primary_image_role,
             frame_count,
             clothing_focus=prompt_mode == PROMPT_CHARACTER_CLOTHING,
-            eight_view_focus=prompt_mode == PROMPT_CHARACTER_EIGHT,
+            eight_view_focus=(
+                prompt_mode == PROMPT_CHARACTER_EIGHT or character_sheet_profile == QUALITY_CHARACTER_EIGHT
+            ),
         )
 
     if prompt_mode in DIRECTED_PROMPT_MODES:
@@ -1599,7 +1602,7 @@ class TextEncodeH3Edit:
                         "default": QUALITY_RECOMMENDED,
                         "tooltip": (
                             "H3 is video-trained. Recommended matches Studio's short 5-frame context, then the decoder "
-                            "returns one stable frame. Character-sheet profiles create calibrated 73/124/243-frame "
+                            "returns one stable frame. Character-sheet profiles create calibrated 73/124-frame "
                             "sequences for the dedicated sheet decoder. Scene-coverage profiles create a trained-range camera path for "
                             "the dedicated coverage decoder. True 1-frame mode is often poor quality."
                         ),
@@ -1780,7 +1783,7 @@ class TextEncodeH3Edit:
         if clothing_sheet_task and quality_profile != QUALITY_CHARACTER_SIX:
             raise ValueError("The clothing-focused character sheet requires 'character sheet | 6 panels / 124-frame orbit'.")
         if eight_sheet_task and quality_profile != QUALITY_CHARACTER_EIGHT:
-            raise ValueError("The eight-view character sheet requires 'character sheet | 8 panels / 243-frame sequence'.")
+            raise ValueError("The eight-view character sheet requires 'character sheet | 8 panels / 124-frame sequence'.")
         if coverage_direction not in SCENE_DIRECTIONS:
             raise ValueError(f"Unknown coverage direction: {coverage_direction}")
         coverage_views = max(2, min(24, int(coverage_views)))
@@ -1967,6 +1970,7 @@ class TextEncodeH3Edit:
                 additional_modes,
                 requested_frames,
                 primary_image_role,
+                character_sheet_profile=quality_profile,
                 scene_capture_plan=scene_capture_plan,
                 scene_direction=coverage_direction,
                 scene_loop_closure=scene_loop_closure,
@@ -2152,7 +2156,7 @@ class DecodeH3CharacterSheet:
     """Decode an H3 character sequence, extract calibrated views, and stitch one sheet."""
 
     DESCRIPTION = (
-        "Decodes a 73-, 124-, or 243-frame H3 character sequence, extracts four, six, or eight calibrated views, and "
+        "Decodes a 73- or 124-frame H3 character sequence, extracts four, six, or eight calibrated views, and "
         "stitches a 2x2, 3x2, or 4x2 sheet. Also returns the selected views and full decoded frame batch."
     )
 
@@ -2164,7 +2168,7 @@ class DecodeH3CharacterSheet:
                 "vae": ("VAE", {"tooltip": "MiniMax H3 video VAE."}),
                 "layout": (
                     CHARACTER_SHEET_LAYOUTS,
-                    {"default": CHARACTER_SHEET_AUTO, "tooltip": "Auto reads the encoded 73/124/243-frame profile."},
+                    {"default": CHARACTER_SHEET_AUTO, "tooltip": "Auto reads the encoded 73/124-frame profile metadata."},
                 ),
                 "gutter_px": ("INT", {"default": 6, "min": 0, "max": 256, "step": 1}),
                 "gutter_color": (GUTTER_COLORS, {"default": "black"}),
@@ -2201,15 +2205,13 @@ class DecodeH3CharacterSheet:
             encoded_profile = samples.get("h3edit_character_sheet_profile")
             if encoded_profile in CHARACTER_SHEET_FRAME_INDICES:
                 profile = encoded_profile
-            elif requested_frames >= 243:
-                profile = QUALITY_CHARACTER_EIGHT
             elif requested_frames >= 124:
                 profile = QUALITY_CHARACTER_SIX
             elif requested_frames >= 73:
                 profile = QUALITY_CHARACTER_FOUR
             else:
                 raise ValueError(
-                    "Auto character-sheet layout requires a 73-, 124-, or 243-frame encoded profile; "
+                    "Auto character-sheet layout requires a 73- or 124-frame encoded profile; "
                     f"the latent requests {requested_frames} frame(s)."
                 )
         else:

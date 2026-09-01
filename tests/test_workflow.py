@@ -7,6 +7,7 @@ WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Edit_Mixed_Refe
 CHARACTER_WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Character_Sheet_6_Panel.json"
 CLOTHING_WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Character_Clothing_6_View.json"
 EIGHT_VIEW_WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Character_Sheet_8_View.json"
+EIGHT_VIEW_PROMPT = Path(__file__).parents[1] / "prompts" / "H3_Character_Sheet_8_View.txt"
 DIRECTED_WORKFLOW = Path(__file__).parents[1] / "example_workflows" / "H3_Directed_Transformations.json"
 
 
@@ -130,7 +131,7 @@ def test_eight_view_character_workflow_uses_long_body_detail_face_sequence():
     encoder = nodes[9]
     assert encoder["widgets_values"][1] == "generate | native Picture 1 (REF2VA)"
     assert encoder["widgets_values"][6] == "character sheet | 8-view body detail"
-    assert encoder["widgets_values"][9] == "character sheet | 8 panels / 243-frame sequence"
+    assert encoder["widgets_values"][9] == "character sheet | 8 panels / 124-frame sequence"
     assert encoder["inputs"][14]["link"] is not None
     assert encoder["inputs"][20]["name"] == "options"
     assert encoder["inputs"][20]["link"] is not None
@@ -141,12 +142,34 @@ def test_eight_view_character_workflow_uses_long_body_detail_face_sequence():
     assert "eight calibrated" in decoder["title"]
 
     instructions = nodes[20]["widgets_values"][0]
-    assert "243-frame" in instructions
-    assert "frames **2, 30, 60, 90, 150, 195, 225, and 240**" in instructions
+    assert "124-frame" in instructions
+    assert "frames **2, 21, 42, 63, 84, 96, 108, and 120**" in instructions
     assert "waist-to-knee" in instructions
     assert "never stops" in instructions
     assert "without numbered shot tags" in instructions
     assert "C_Nugget" in instructions
+
+
+def test_standalone_eight_view_prompt_matches_decoder_schedule():
+    prompt = EIGHT_VIEW_PROMPT.read_text(encoding="utf-8")
+    sections = [
+        "subject_definitions:",
+        "summary:",
+        "retention_analysis:",
+        "detailed_description:",
+        "overall_soundscape:",
+        "non_diegetic_music:",
+    ]
+
+    assert [prompt.index(section) for section in sections] == sorted(prompt.index(section) for section in sections)
+    assert all(f"<Picture {ordinal}>" in prompt for ordinal in (1, 2, 3))
+    assert "124-frame target" in prompt
+    assert "decoder frame 84" in prompt
+    assert "decoder frame 96" in prompt
+    assert "camera never stops during this detail orbit" in prompt
+    assert "00:04.500" in prompt
+    assert "00:05.000" in prompt
+    assert "[Shot" not in prompt
 
 
 def test_directed_workflow_switches_three_tasks_and_selects_settled_tail():
