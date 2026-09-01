@@ -79,13 +79,13 @@ The character-sheet profiles generate all views in one continuous H3 pass so ide
 
 `character sheet | clothing 6 views` uses the same calibrated 124-frame decoder but replaces the final facial push-ins with six constant-scale apparel captures at 0°, 60°, 120°, 180°, 240°, and 300°. Every panel keeps one fixed long-telephoto lens, camera height, radius, optical target, and head-to-knee crop. There is no zoom, push-in, lens change, or facial close-up. The subject stays motionless in a neutral A-pose while the camera settles at frames `2, 21, 42, 63, 84, 113`, keeping the head, shoulders, arms, hands, torso, hips, thighs, and knees visible for clothing comparison.
 
-`character sheet | canonical 8 views` expands the timeline to 243 frames (10.13 seconds at 24 fps). It captures square-front, left-profile, square-back, and right-profile full-body views at frames `2, 36, 72, 108`; square-front and shallow front-left three-quarter waist-to-knee views at `156, 180`; then front and front-left three-quarter head-and-shoulders views at `207, 237`. Every target has a five-frame static hold, the subject remains unchanged and non-explicit, and Auto decoding uses embedded profile metadata to produce a 4x2 sheet.
+`character sheet | canonical 8 views` expands the timeline to 243 frames (10.13 seconds at 24 fps). It captures square-front, left-profile, square-back, and right-profile full-body views at frames `2, 30, 60, 90`. The camera returns front, lowers to waist-to-knee framing, and continues rotating without stopping: the decoder samples the left profile at `150` and back-right three-quarter at `195`. It then completes the orbit and captures front and front-left three-quarter head-and-shoulders views at `225, 240`. The body and face targets use five-frame static holds; the two waist-to-knee targets are crisp pass-by frames with continuous background parallax. The subject remains unchanged and non-explicit, and Auto decoding uses embedded profile metadata to produce a 4x2 sheet.
 
 | Profile | Sequence frames | Extracted indices | Sheet |
 |---|---:|---|---|
 | `4 panels` | 73 | `2, 24, 45, 68` | 2x2 |
 | `6 panels` | 124 | `2, 21, 42, 63, 84, 113` | 3x2 |
-| `8 panels` | 243 | `2, 36, 72, 108, 156, 180, 207, 237` | 4x2 |
+| `8 panels` | 243 | `2, 30, 60, 90, 150, 195, 225, 240` | 4x2 |
 
 Use a generation role rather than the strong edit anchor. Native Picture 1 plus native builders is the default high-fidelity REF2VA route. An all-semantic set uses Qwen-only FL2VA generation without any input VAE encoding; semantic/native mixing remains experimental.
 

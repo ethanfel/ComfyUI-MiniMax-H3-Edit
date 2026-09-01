@@ -52,7 +52,7 @@ SCENE_COVERAGE_PROFILES = {
 CHARACTER_SHEET_FRAME_INDICES = {
     QUALITY_CHARACTER_FOUR: (2, 24, 45, 68),
     QUALITY_CHARACTER_SIX: (2, 21, 42, 63, 84, 113),
-    QUALITY_CHARACTER_EIGHT: (2, 36, 72, 108, 156, 180, 207, 237),
+    QUALITY_CHARACTER_EIGHT: (2, 30, 60, 90, 150, 195, 225, 240),
 }
 CHARACTER_SHEET_AUTO = "auto from encoded profile"
 CHARACTER_SHEET_FOUR = "4 panels | 2x2"
@@ -795,7 +795,8 @@ def _build_character_sheet_prompt(
             raise ValueError("The eight-view character sheet requires the 243-frame profile.")
         summary = (
             "[reference generation] The target video presents <Subject 1> as one coherent character in eight calibrated "
-            "captures: four full-body orbit views, two front-oriented waist-to-knee detail views, and two facial views."
+            "captures: four full-body orbit views, two continuously orbiting waist-to-knee detail views, and two facial "
+            "views."
         )
         retention = (
             "<Subject 1> (appears throughout the target video): fully_preserved - preserve the requested identity, facial "
@@ -810,20 +811,22 @@ def _build_character_sheet_prompt(
             "established body coverage remain locked in exactly the same configuration; do not introduce nudity or explicit "
             "anatomical exposure. Camera roll, exposure, focus, lighting, and subject proportions remain fixed. There is no "
             "body motion, breathing, blinking, wind, secondary motion, camera shake, or motion blur. Use one continuous "
-            "untagged timeline and become perfectly static during every five-frame capture hold. Begin with a fixed long-"
-            "telephoto near-orthographic full-body composition. Capture square front, centered at 00:00.083 and held from "
-            "00:00.000 through 00:00.167; left profile, centered at 00:01.500 and held from 00:01.417 through 00:01.583; "
-            "square back, centered at 00:03.000 and held from 00:02.917 through 00:03.083; and right profile, centered at "
-            "00:04.500 and held from 00:04.417 through 00:04.583. Complete the same clockwise orbit back to square front by "
-            "00:06.000 without changing the character. Then move the camera to a neutral square-front waist-to-knee "
-            "composition, with the upper frame edge slightly above the waist and the lower edge immediately below both "
-            "knees; settle it at 00:06.500 and hold from 00:06.417 through 00:06.583. Without changing crop height or "
-            "magnification, move to a shallow front-left three-quarter waist-to-knee view, centered at 00:07.500 and held "
-            "from 00:07.417 through 00:07.583. Next return square front while moving upward into a locked head-and-shoulders "
-            "view, centered at 00:08.625 and held from 00:08.542 through 00:08.708. Finally reposition to a clean front-left "
-            "three-quarter head-and-shoulders view, centered at 00:09.875 and held from 00:09.792 through 00:09.958; retain "
-            "that final view unchanged through the last frame. Every transition is a deliberate physical camera move, never "
-            "a morph, and every extracted capture must depict the same unchanged person."
+            "untagged timeline. Begin with a fixed long-telephoto near-orthographic full-body composition. Briefly become "
+            "perfectly static for square front, centered at 00:00.083 and held from 00:00.000 through 00:00.167; left "
+            "profile, centered at 00:01.250 and held from 00:01.167 through 00:01.333; square back, centered at 00:02.500 "
+            "and held from 00:02.417 through 00:02.583; and right profile, centered at 00:03.750 and held from 00:03.667 "
+            "through 00:03.833. Complete the same clockwise orbit back to square front by 00:05.000 without changing the "
+            "character. While continuing the clockwise rotation without any pause or capture hold, lower the optical target "
+            "and tighten to a waist-to-knee composition whose upper edge sits slightly above the waist and whose lower edge "
+            "sits immediately below both knees. The camera never stops during this detail orbit. It passes the exact left-"
+            "profile waist-to-knee view at 00:06.250, decoder frame 150, then passes square back and reaches the exact back-"
+            "right three-quarter waist-to-knee view at 00:08.125, decoder frame 195. Keep both pass-by frames crisp with no "
+            "motion blur and preserve identical crop height and magnification while the background parallax proves the "
+            "camera is still rotating. Continue clockwise to square front by 00:09.000, then move upward into a locked head-"
+            "and-shoulders view, centered at 00:09.375 and held from 00:09.292 through 00:09.458. Finally reposition to a "
+            "clean front-left three-quarter head-and-shoulders view, centered at 00:10.000 and held from 00:09.917 through "
+            "00:10.083, the last frame. Every transition is a deliberate physical camera move, never a morph, and every "
+            "extracted capture must depict the same unchanged person."
         )
     elif clothing_focus:
         if frame_count != 124:

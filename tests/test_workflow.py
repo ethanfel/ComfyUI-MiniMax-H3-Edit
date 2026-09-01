@@ -142,8 +142,9 @@ def test_eight_view_character_workflow_uses_long_body_detail_face_sequence():
 
     instructions = nodes[20]["widgets_values"][0]
     assert "243-frame" in instructions
-    assert "frames **2, 36, 72, 108, 156, 180, 207, and 237**" in instructions
+    assert "frames **2, 30, 60, 90, 150, 195, 225, and 240**" in instructions
     assert "waist-to-knee" in instructions
+    assert "never stops" in instructions
     assert "without numbered shot tags" in instructions
     assert "C_Nugget" in instructions
 
