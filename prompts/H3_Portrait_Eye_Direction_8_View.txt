@@ -1,0 +1,31 @@
+For the target video, at 0.00 seconds into the target video, <Picture 1> (from Shot 1) is fully referenced.
+
+integrated_multimodal_description: Create one uninterrupted source-matched portrait gaze study from <Picture 1>. <Picture 1> is the exact first-frame anchor. Preserve the same person, facial identity, age, skin texture, hair, makeup, expression, wardrobe, body position, portrait crop, background, lighting, exposure, color, lens, focus, and depth of field for the entire sequence. There is no final-frame reference and no requirement to return to the opening gaze.
+
+The physical camera is locked to a tripod for the entire sequence. The camera never pans, tilts, rolls, zooms, reframes, dollies, or changes focus. The person's entire head, neck, shoulders, and torso remain completely motionless. Lock the head to the exact opening position and orientation: zero head yaw, zero head pitch, zero head roll, zero nod, zero turn, zero tilt, zero lean, and zero translation. Preserve the exact skull silhouette, hair silhouette, ear positions, nose angle, chin position, mouth, eyebrows, and facial expression. The head lock is the highest-priority constraint.
+
+Only the two eyeballs move. Both eyes move together and aim at the same imagined target attached to the named edge or corner of the camera image. Every direction below is defined in image-space from the viewer's perspective, never as the person's anatomical left or right. Make each gaze displacement clear and readable but physiologically plausible. Preserve both eye shapes, iris color, pupil size, sclera, eyelid anatomy, eye spacing, catchlight count, and facial identity. The eyelids may follow the rotating eyes only by the minimal anatomically necessary amount. Do not blink, squint, widen the eyes, move the eyebrows, move the mouth, change expression, cross the eyes, let the eyes diverge, deform the irises, duplicate pupils, or add eyes.
+
+Move between targets with one quick natural conjugate eye saccade, then let both eyes settle completely on the exact camera-frame target. During every named hold the irises and pupils are motionless, sharp, unobstructed, and visibly aimed at that target while the head and camera remain perfectly fixed. Do not anticipate the next target and do not blend two directions during a hold.
+
+At 00:00.000, Capture 1 preserves the untouched source portrait and its original gaze exactly. This is the reference tile, not one of the eight commanded gaze directions. Hold the exact anchored frame from 00:00.000 through 00:00.083.
+
+At 00:01.250, Capture 2: both eyes look at a precise point touching the midpoint of the left edge of the camera image. The pupils move clearly toward frame-left while the head remains exactly fixed. Hold this left-edge gaze from 00:01.167 through 00:01.333.
+
+At 00:02.500, Capture 3: both eyes look at the precise upper-left corner of the camera image, as though a tiny marker is attached to that corner. The pupils move diagonally toward frame-left and frame-top while the head remains exactly fixed. Hold this upper-left-corner gaze from 00:02.417 through 00:02.583.
+
+At 00:03.792, Capture 4: both eyes look at a precise point touching the midpoint of the top edge of the camera image. The pupils move clearly upward toward frame-top while the head remains exactly fixed. Hold this top-edge gaze from 00:03.708 through 00:03.875.
+
+At 00:05.042, Capture 5: both eyes look at the precise upper-right corner of the camera image, as though a tiny marker is attached to that corner. The pupils move diagonally toward frame-right and frame-top while the head remains exactly fixed. Hold this upper-right-corner gaze from 00:04.958 through 00:05.125.
+
+At 00:06.292, Capture 6: both eyes look at a precise point touching the midpoint of the right edge of the camera image. The pupils move clearly toward frame-right while the head remains exactly fixed. Hold this right-edge gaze from 00:06.208 through 00:06.375.
+
+At 00:07.583, Capture 7: both eyes look at the precise lower-right corner of the camera image, as though a tiny marker is attached to that corner. The pupils move diagonally toward frame-right and frame-bottom while the head remains exactly fixed. Hold this lower-right-corner gaze from 00:07.500 through 00:07.667.
+
+At 00:08.833, Capture 8: both eyes look at a precise point touching the midpoint of the bottom edge of the camera image. The pupils move clearly downward toward frame-bottom while the head remains exactly fixed. Hold this bottom-edge gaze from 00:08.750 through 00:08.917.
+
+At 00:10.083, Capture 9: both eyes look at the precise lower-left corner of the camera image, as though a tiny marker is attached to that corner. The pupils move diagonally toward frame-left and frame-bottom while the head remains exactly fixed. Reach this final lower-left-corner gaze by 00:10.000 and hold it through the final frame.
+
+overall_soundscape: N/A
+
+non_diegetic_music: N/A
